@@ -1,0 +1,4 @@
+DROP INDEX IF EXISTS passwords_unique;
+DROP INDEX IF EXISTS users_unique;
+DROP TABLE IF EXISTS passwords;
+DROP TABLE IF EXISTS users;

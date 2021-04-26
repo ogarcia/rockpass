@@ -1,0 +1,29 @@
+# You can have several different environments (valid ones are development,
+# staging and production) and use ROCKET_ENV variable to switch between
+# them. By default production is used.
+[production]
+# Listen address
+address = "0.0.0.0"
+# Listen port
+port = 8000
+# Set if new users can register or not. If you set to false only previous
+# registered users can login an use server.
+registration_enabled = true
+# Log level, set to "critical" to disable it and log only critical errors.
+log = "normal"
+# Secret key is used for encrypt cookies. At this moment cookies are not
+# used by Rockpass, but you need define a value to avoid warnings. To
+# generate a new one you can execute `openssl rand -base64 32`.
+secret_key = "fIdKuZfnI2oUJg4HMrKB7RTXxXS5B2Yw9D5RpOaKciI="
+[production.databases.rockpass]
+# Location of SQlite database
+url = "/tmp/rockpass.sqlite"
+
+# Other sample
+[development]
+address = "127.0.0.1"
+port = 9000
+registration_enabled = true
+[development.databases.rockpass]
+# Use database in memory
+url = ":memory:"

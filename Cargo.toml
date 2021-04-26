@@ -1,0 +1,29 @@
+[package]
+name = "rockpass"
+version = "0.1.0"
+authors = ["Óscar García Amor"]
+license = "GPL-3.0"
+readme = "README.md"
+repository = "https://github.com/ogarcia/rockpass"
+documentation = "https://github.com/ogarcia/rockpass"
+homepage = "https://github.com/ogarcia/rockpass"
+description = """
+A small and ultrasecure Lesspass database server written in Rust.
+"""
+keywords = ["lesspass", "database", "rocket", "server"]
+edition = "2018"
+include = ["migrations/", "src/", "diesel.toml", "LICENSE", "README.md", "Rocket.toml.example"]
+
+[dependencies]
+base64 = "0.13.0"
+bcrypt = "0.9.0"
+chrono = { version = "0.4.19", features = ["serde"] }
+diesel = { version = "1.4.6", default-features = false, features = ["sqlite", "chrono"] }
+diesel_migrations = "1.4.0"
+hmac = "0.10.1"
+jwt = "0.13.0"
+rocket = "0.4.7"
+rocket_contrib = { version = "0.4.7", default-features = false, features = ["json", "diesel_sqlite_pool"] }
+serde = { version = "1.0.125", features = ["derive"] }
+sha2 = "0.9.3"
+uuid = { version = "0.8.2", default-features = false, features = ["v4"] }
