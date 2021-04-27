@@ -23,6 +23,12 @@ pub struct NewUser {
     pub password: String
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct NewUserPassword {
+    pub current_password: String,
+    pub new_password: String
+}
+
 #[derive(Serialize, Deserialize, Queryable)]
 pub struct Password {
     pub id: i32,

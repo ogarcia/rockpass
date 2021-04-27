@@ -33,6 +33,7 @@ fn database_migrations(rocket: Rocket) -> Result<Rocket, Rocket> {
 }
 
 pub struct RegistrationEnabled(bool);
+pub struct TokenLifetime(i64);
 
 fn main() {
     rocket::ignite()
@@ -45,9 +46,17 @@ fn main() {
                 .unwrap_or(true);
             Ok(rocket.manage(RegistrationEnabled(registration_enabled)))
         }))
+        .attach(AdHoc::on_attach("Token lifetime config", |rocket| {
+            let token_lifetime = rocket.config()
+                .get_int("token_lifetime")
+                .unwrap_or(2592000);
+            Ok(rocket.manage(TokenLifetime(token_lifetime)))
+        }))
         .mount("/", routes![
                routes::options_auth_users,
                routes::post_auth_users,
+               routes::options_auth_users_set_password,
+               routes::post_auth_users_set_password,
                routes::options_auth_jwt_create,
                routes::post_auth_jwt_create,
                routes::options_auth_jwt_refresh,

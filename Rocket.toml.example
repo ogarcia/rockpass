@@ -9,6 +9,9 @@ port = 8000
 # Set if new users can register or not. If you set to false only previous
 # registered users can login an use server.
 registration_enabled = true
+# Set the life time of login token in seconds. If the user don't refresh
+# token in this time, must login again.
+token_lifetime = 2592000
 # Log level, set to "critical" to disable it and log only critical errors.
 log = "normal"
 # Secret key is used for encrypt cookies. At this moment cookies are not

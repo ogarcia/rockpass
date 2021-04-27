@@ -4,7 +4,7 @@
 // Distributed under terms of the GNU GPLv3 license.
 //
 
-use bcrypt::{DEFAULT_COST, hash, verify};
+use bcrypt::{hash, verify};
 use chrono::Duration;
 use chrono::prelude::*;
 use diesel::{self, prelude::*};
@@ -20,10 +20,13 @@ use sha2::Sha256;
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
-use crate::models::{NewUser, User, NewPassword, Password};
-use crate::{RockpassDatabase, RegistrationEnabled};
+use crate::models::{NewUser, NewUserPassword, User, NewPassword, Password};
+use crate::{RockpassDatabase, RegistrationEnabled, TokenLifetime};
 use crate::schema::users::dsl::*;
-use crate::schema::{passwords, passwords::dsl::*};
+use crate::schema::{passwords, users, passwords::dsl::*};
+
+// Define bcrypt cost for password
+const BCRYPT_COST: u32 = 10;
 
 pub struct Authorization(RockpassDatabase, User);
 
@@ -43,7 +46,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Authorization {
             Some(auth) => {
                 // Authorization must start with 'bearer'
                 if (auth.len() > 7) && (&auth[..6].to_lowercase()) == "bearer" {
-                    // Create database connection
+                    // Get database connection
                     let connection = request.guard::<RockpassDatabase>().expect("database connection");
                     // Check the autorization token (remove 'bearer' and pass JWT token only)
                     match check_authorization(&connection, &auth[7..]) {
@@ -82,14 +85,14 @@ fn check_authorization(connection: &diesel::SqliteConnection, authorization_toke
     }
 }
 
-fn new_jwt(shared_key: &String, uuid: &String) -> String {
+fn new_jwt(shared_key: &String, uuid: &String, token_lifetime: &i64) -> String {
     // Create new HMAC key with shared key
     let key: Hmac<Sha256> = Hmac::new_varkey(&format!("{}", shared_key).into_bytes()).unwrap();
     // Add UUID into token
     let mut claims = BTreeMap::new();
     claims.insert("uuid", uuid);
     // Add expiration date (in timestamp)
-    let expiration_date = (Utc::now() + Duration::days(30)).format("%s").to_string();
+    let expiration_date = (Utc::now() + Duration::seconds(*token_lifetime)).format("%s").to_string();
     claims.insert("exp", &expiration_date);
     // Return new JWT token
     claims.sign_with_key(&key).unwrap()
@@ -108,11 +111,11 @@ fn check_jwt(shared_key: &String, jwt_token: &String) -> Result<(), ()> {
     }
 }
 
-fn refresh_token(connection: &diesel::SqliteConnection, user: &User) -> Result<String, ()> {
+fn refresh_token(connection: &diesel::SqliteConnection, user: &User, token_lifetime: &i64) -> Result<String, ()> {
     // Make new UUID for user token
     let uuid = Uuid::new_v4().to_string();
     // Calculate new JWT token
-    let jwt = new_jwt(&user.password, &uuid);
+    let jwt = new_jwt(&user.password, &uuid, &token_lifetime);
     // Insert it into database
     match diesel::update(users.find(&user.id))
         .set(token.eq(&uuid))
@@ -134,11 +137,11 @@ pub fn options_auth_users<'a>() -> Response<'a> {
 }
 
 #[post("/auth/users", data = "<user>")]
-pub fn post_auth_users(connection: RockpassDatabase, user: Json<NewUser>, registration_enabled: State<RegistrationEnabled>) -> status::Custom<Json<JsonValue>> {
+pub fn post_auth_users(connection: RockpassDatabase, registration_enabled: State<RegistrationEnabled>, user: Json<NewUser>) -> status::Custom<Json<JsonValue>> {
     if registration_enabled.0 {
         // Register new user
         let uuid = Uuid::new_v4().to_string();
-        let bcrypted_password = hash(&user.0.password, DEFAULT_COST).unwrap();
+        let bcrypted_password = hash(&user.0.password, BCRYPT_COST).unwrap();
         let inserted_rows = match diesel::insert_into(users)
             .values((email.eq(&user.0.email), password.eq(bcrypted_password), token.eq(uuid)))
             .execute(&connection.0) {
@@ -154,13 +157,40 @@ pub fn post_auth_users(connection: RockpassDatabase, user: Json<NewUser>, regist
     }
 }
 
+#[options("/auth/users/set_password")]
+pub fn options_auth_users_set_password<'a>() -> Response<'a> {
+    Response::build().status(Status::NoContent).finalize()
+}
+
+#[post("/auth/users/set_password", data = "<new_user_password>")]
+pub fn post_auth_users_set_password(authorization: Authorization, new_user_password: Json<NewUserPassword>) -> status::Custom<Json<JsonValue>> {
+    if verify(&new_user_password.0.current_password, &authorization.1.password).unwrap() {
+        let connection = authorization.0;
+        let bcrypted_password = hash(&new_user_password.0.new_password, BCRYPT_COST).unwrap();
+        // Change user password
+        let updated_rows = match diesel::update(users)
+            .filter(users::id.eq(&authorization.1.id))
+            .set(password.eq(bcrypted_password))
+            .execute(&connection.0) {
+                Ok(rows) => rows,
+                Err(_) => 0
+            };
+        match updated_rows {
+            0 => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem updating the password"}))),
+            _ => status::Custom(Status::Ok, Json(json!({"detail": format!("Passwod changed for user {}", authorization.1.email)})))
+        }
+    } else {
+        status::Custom(Status::Forbidden, Json(json!({"detail": "Old password does not match with the one stored in database"})))
+    }
+}
+
 #[options("/auth/jwt/create")]
 pub fn options_auth_jwt_create<'a>() -> Response<'a> {
     Response::build().status(Status::NoContent).finalize()
 }
 
 #[post("/auth/jwt/create", data = "<user>")]
-pub fn post_auth_jwt_create(connection: RockpassDatabase, user: Json<NewUser>) -> status::Custom<Json<JsonValue>> {
+pub fn post_auth_jwt_create(connection: RockpassDatabase, token_lifetime: State<TokenLifetime>, user: Json<NewUser>) -> status::Custom<Json<JsonValue>> {
     // Seek for user in database
     let results: Vec<User> = users.filter(email.eq(&user.0.email))
         .limit(1)
@@ -171,7 +201,7 @@ pub fn post_auth_jwt_create(connection: RockpassDatabase, user: Json<NewUser>) -
         return status::Custom(Status::Unauthorized, Json(json!({"detail": "No active account found with the given credentials"})));
     }
     // Generate new token
-    match refresh_token(&connection.0, &results[0]) {
+    match refresh_token(&connection.0, &results[0], &token_lifetime.0) {
         Ok(refreshed_token) => status::Custom(Status::Created, Json(json!({"access": refreshed_token}))),
         Err(()) => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem generating the new token"})))
     }
@@ -184,9 +214,9 @@ pub fn options_auth_jwt_refresh<'a>() -> Response<'a> {
 
 
 #[post("/auth/jwt/refresh")]
-pub fn post_auth_jwt_refresh(authorized_user: Authorization) -> status::Custom<Json<JsonValue>> {
+pub fn post_auth_jwt_refresh(authorized_user: Authorization, token_lifetime: State<TokenLifetime>) -> status::Custom<Json<JsonValue>> {
     // Generate new token
-    match refresh_token(&authorized_user.0, &authorized_user.1) {
+    match refresh_token(&authorized_user.0, &authorized_user.1, &token_lifetime.0) {
         Ok(refreshed_token) => status::Custom(Status::Created, Json(json!({"access": refreshed_token}))),
         Err(()) => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem generating the new token"})))
     }

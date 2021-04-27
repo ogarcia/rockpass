@@ -39,10 +39,11 @@ Since Rockpass is based in Rocket, the config is same that is detailed in
 [Rocket documentation][4]. Anyway a `Rocket.toml.example` is provided with
 comments and the interesting field are the following.
 
-|         Setting        |                         Use                         | Default value |
-|:----------------------:|:---------------------------------------------------:|:-------------:|
-| `registration_enabled` | Enable or disable the ability to register new users | true          |
-| `rockpass`             | SQLite database location (see below)                |               |
+|         Setting        |                         Use                         |   Default value   |
+|:----------------------:|:---------------------------------------------------:|:-----------------:|
+| `registration_enabled` | Enable or disable the ability to register new users | true              |
+| `token_lifetime`       | Time, in seconds, that the login token is valid     | 2592000 (30 days) |
+| `rockpass`             | SQLite database location (see below)                |                   |
 
 The database configuration can be detailed in two options.
 
@@ -74,3 +75,19 @@ ROCKET_DATABASES='{rockpass = { url = ":memory:" }}' rockpass
 ```
 
 [4]: https://rocket.rs/v0.4/guide/configuration/
+
+## Known limitations
+
+For now, user deletion cannot be done via API. If you want to delete an user
+you can do it with `sqlite` command. For example to delete user
+_user@example.com_ and all of his/her passwords settings.
+
+1. _Connect_ to database.
+   ```sh
+   sqlite3 /location/of/rockpass.sqlite
+   ```
+2. Detete user.
+   ```sql
+   PRAGMA foreign_keys = ON;
+   DELETE FROM users WHERE email = 'user@example.com';
+   ```
