@@ -16,3 +16,10 @@ jobs:
         with:
           command: build
           args: --release --locked --all-features
+      - name: package
+        run: |
+          install -Dm755 "target/release/rockpass" "rockpass-${GITHUB_REF##*/}/rockpass"
+          install -Dm644 "Rocket.toml.example" "rockpass-${GITHUB_REF##*/}/Rocket.toml.example"
+          install -Dm644 "README.md" "rockpass-${GITHUB_REF##*/}/README.md"
+          install -Dm644 "LICENSE" "rockpass-${GITHUB_REF##*/}/LICENSE"
+          tar cvJf "rockpass-${GITHUB_REF##*/}.tar.xz" "rockpass-${GITHUB_REF##*/}"
