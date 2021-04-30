@@ -18,7 +18,7 @@ jobs:
           args: --release --locked --all-features
       - name: package
         id: package
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request'
         run: |
           install -Dm755 "target/release/rockpass" "rockpass-${GITHUB_REF##*/}/rockpass"
           install -Dm644 "Rocket.toml.example" "rockpass-${GITHUB_REF##*/}/Rocket.toml.example"
@@ -27,7 +27,7 @@ jobs:
           tar cvJf "rockpass-${GITHUB_REF##*/}.tar.xz" "rockpass-${GITHUB_REF##*/}"
           echo ::set-output name=version::${GITHUB_REF##*/}
       - uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request'
         with:
           files: "rockpass-${{ steps.package.outputs.version }}.tar.xz"
         env:
