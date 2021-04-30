@@ -17,6 +17,7 @@ jobs:
           command: build
           args: --release --locked --all-features
       - name: package
+        id: package
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           install -Dm755 "target/release/rockpass" "rockpass-${GITHUB_REF##*/}/rockpass"
@@ -24,9 +25,10 @@ jobs:
           install -Dm644 "README.md" "rockpass-${GITHUB_REF##*/}/README.md"
           install -Dm644 "LICENSE" "rockpass-${GITHUB_REF##*/}/LICENSE"
           tar cvJf "rockpass-${GITHUB_REF##*/}.tar.xz" "rockpass-${GITHUB_REF##*/}"
+          echo ::set-output name=version::${GITHUB_REF##*/}
       - uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: "rockpass-${GITHUB_REF##*/}.tar.xz"
+          files: "rockpass-${{ steps.package.outputs.version }}.tar.xz"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
