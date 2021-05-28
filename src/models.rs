@@ -9,12 +9,18 @@ use chrono::NaiveDateTime;
 
 use crate::schema::passwords;
 
-#[derive(Serialize, Deserialize, Queryable)]
-pub struct User {
+pub struct AuthorizedUser {
     pub id: i32,
     pub email: String,
     pub password: String,
     pub token: String
+}
+
+#[derive(Serialize, Deserialize, Queryable)]
+pub struct User {
+    pub id: i32,
+    pub email: String,
+    pub password: String
 }
 
 #[derive(Serialize, Deserialize)]
@@ -27,6 +33,15 @@ pub struct NewUser {
 pub struct NewUserPassword {
     pub current_password: String,
     pub new_password: String
+}
+
+#[derive(Serialize, Deserialize, Queryable)]
+pub struct DBToken {
+    pub id: i32,
+    pub user_id: i32,
+    pub token: String,
+    pub created: NaiveDateTime,
+    pub modified: NaiveDateTime
 }
 
 #[derive(Serialize, Deserialize, Queryable)]

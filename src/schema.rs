@@ -17,17 +17,28 @@ table! {
 }
 
 table! {
+    tokens (id) {
+        id -> Integer,
+        user_id -> Integer,
+        token -> Text,
+        created -> Timestamp,
+        modified -> Timestamp,
+    }
+}
+
+table! {
     users (id) {
         id -> Integer,
         email -> Text,
         password -> Text,
-        token -> Text,
     }
 }
 
 joinable!(passwords -> users (user_id));
+joinable!(tokens -> users (user_id));
 
 allow_tables_to_appear_in_same_query!(
     passwords,
+    tokens,
     users,
 );
