@@ -7,7 +7,71 @@ A small and ultrasecure [Lesspass][1] database server written in [Rust][2].
 
 ## Installation
 
-### Installing Rust
+### From binary
+
+Simply download latest release from [releases page][releases]. You can use
+[systemd unit][unit] from [Arch Linux package][package] to run it.
+
+[releases]: https://github.com/ogarcia/rockpass/releases
+[unit]: https://aur.archlinux.org/cgit/aur.git/tree/rockpass.service?h=rockpass
+[package]: https://aur.archlinux.org/packages/rockpass
+
+### With Docker
+
+A docker image of Rockpass can be downloaded from [here][ghcr] or from
+[Docker Hub][hub].
+
+To run it, simply exec.
+```
+docker run -t -d \
+  --name=rockpass \
+  -p 8000:8000 \
+  ogarcia/rockpass
+```
+
+This start Rockpass and publish the port to host.
+
+Warning: this is a basic run, all data will be destroyed after container
+stop and rm.
+
+[ghcr]: https://github.com/users/ogarcia/packages/container/package/rockpass
+[hub]: https://hub.docker.com/repository/docker/ogarcia/rockpass
+
+#### Persist data using a Docker volume
+
+Rockpass Docker image uses a volume `/var/lib/rockpass` to store sqlite
+database. You can exec the following to mount it in your host as persistent
+storage.
+```
+docker run -t -d \
+  --name=rockpass \
+  -p 8000:8000 \
+  -v /my/rockpass:/var/lib/rockpass \
+  ogarcia/rockpass
+```
+
+Take note that you must create before the directory `/my/rockpass` and set
+ownership to UID/GID 100.
+```
+mkdir -p /my/rockpass
+chown -R 100:100 /my/rockpass
+```
+
+#### Docker environment variables
+
+| Variable | Used for | Default value |
+| --- | --- | --- |
+| `ROCKET_DATABASES` | Database location | {rockpass = { url = \"/var/lib/rockpass/rockpass.sqlite\" }} |
+| `ROCKET_SECRET_KEY` | Unused, but need to be defined to something to avoid warnings | fIdKuZfnI2oUJg4HMrKB7RTXxXS5B2Yw9D5RpOaKciI= |
+| `ROCKET_ADDRESS` | Listen address | 0.0.0.0 |
+| `ROCKET_PORT` | Listen port | 8000 |
+| `ROCKET_REGISTRATION_ENABLED` | Enable or disable the ability to register new users | true |
+| `ROCKET_TOKEN_LIFETIME` | Time, in seconds, that the login token is valid | 2592000 (30 days) |
+| `ROCKET_LOG` | Log level | normal |
+
+### From source
+
+#### Installing Rust
 
 Rockpass is based in [Rocket][3] so you need to use a nightly version of
 Rust.
@@ -22,7 +86,7 @@ rustup override set nightly
 
 [3]: https://rocket.rs/
 
-### Installing Rockpass
+#### Installing Rockpass
 
 To build Rockpass binary simply execute the following commands.
 ```sh
@@ -39,11 +103,11 @@ Since Rockpass is based in Rocket, the config is same that is detailed in
 [Rocket documentation][4]. Anyway a `Rocket.toml.example` is provided with
 comments and the interesting field are the following.
 
-|         Setting        |                         Use                         |   Default value   |
-|:----------------------:|:---------------------------------------------------:|:-----------------:|
-| `registration_enabled` | Enable or disable the ability to register new users | true              |
-| `token_lifetime`       | Time, in seconds, that the login token is valid     | 2592000 (30 days) |
-| `rockpass`             | SQLite database location (see below)                |                   |
+| Setting | Use | Default value |
+| --- | --- | --- |
+| `registration_enabled` | Enable or disable the ability to register new users | true |
+| `token_lifetime` | Time, in seconds, that the login token is valid | 2592000 (30 days) |
+| `rockpass` | SQLite database location (see below) | |
 
 The database configuration can be detailed in two options.
 
