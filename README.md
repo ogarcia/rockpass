@@ -150,7 +150,7 @@ _user@example.com_ and all of his/her passwords settings.
    ```sh
    sqlite3 /location/of/rockpass.sqlite
    ```
-2. Detete user.
+2. Delete user.
    ```sql
    PRAGMA foreign_keys = ON;
    DELETE FROM users WHERE email = 'user@example.com';
