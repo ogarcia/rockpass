@@ -20,7 +20,7 @@ use sha2::Sha256;
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
-use crate::models::{AuthorizedUser, NewUser, NewUserPassword, User, DBToken, NewPassword, Password};
+use crate::models::{AuthorizedUser, NewUser, NewUserPassword, User, JWTRefreshToken, DBToken, NewPassword, Password};
 use crate::{RockpassDatabase, RegistrationEnabled, TokenLifetime};
 use crate::schema::passwords::dsl::*;
 use crate::schema::tokens::dsl::*;
@@ -248,7 +248,7 @@ pub fn post_auth_jwt_create(connection: RockpassDatabase, token_lifetime: State<
                 .filter(tokens::modified.lt(min_modification_date.format("%Y-%m-%d %H:%M:%S").to_string()))
                 .execute(&connection.0)
                 .expect("delete expired tokens");
-            status::Custom(Status::Created, Json(json!({"access": created_token})))
+            status::Custom(Status::Created, Json(json!({"access": created_token, "refresh": created_token})))
         },
         Err(()) => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem generating the new token"})))
     }
@@ -259,13 +259,18 @@ pub fn options_auth_jwt_refresh<'a>() -> Response<'a> {
     Response::build().status(Status::NoContent).finalize()
 }
 
-
-#[post("/auth/jwt/refresh")]
-pub fn post_auth_jwt_refresh(authorized_user: Authorization, token_lifetime: State<TokenLifetime>) -> status::Custom<Json<JsonValue>> {
-    // Generate new token
-    match refresh_token(&authorized_user.0, &authorized_user.1, &token_lifetime.0) {
-        Ok(refreshed_token) => status::Custom(Status::Created, Json(json!({"access": refreshed_token}))),
-        Err(()) => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem generating the new token"})))
+#[post("/auth/jwt/refresh", data = "<jwt_refresh_token>")]
+pub fn post_auth_jwt_refresh(connection: RockpassDatabase, token_lifetime: State<TokenLifetime>, jwt_refresh_token: Json<JWTRefreshToken>) -> status::Custom<Json<JsonValue>> {
+    // Check the refresh token
+    match check_authorization(&connection, &jwt_refresh_token.0.refresh) {
+        Ok(authorized_user) => {
+            // Generate new token
+            match refresh_token(&connection, &authorized_user, &token_lifetime.0) {
+                Ok(refreshed_token) => status::Custom(Status::Created, Json(json!({"access": refreshed_token, "refresh": refreshed_token}))),
+                Err(()) => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem generating the new token"})))
+            }
+        },
+        Err(_) => status::Custom(Status::InternalServerError, Json(json!({"detail": "Your refresh token is not valid"})))
     }
 }
 

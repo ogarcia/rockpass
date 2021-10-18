@@ -35,6 +35,11 @@ pub struct NewUserPassword {
     pub new_password: String
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct JWTRefreshToken {
+    pub refresh: String
+}
+
 #[derive(Serialize, Deserialize, Queryable)]
 pub struct DBToken {
     pub id: i32,
