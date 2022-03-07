@@ -8,7 +8,7 @@ use bcrypt::{hash, verify};
 use chrono::Duration;
 use chrono::prelude::*;
 use diesel::{self, prelude::*};
-use hmac::{Hmac, NewMac};
+use hmac::{Hmac, Mac};
 use jwt::{Header, SignWithKey, Token, VerifyWithKey};
 use rocket::{Outcome, State};
 use rocket::http::Status;
@@ -96,7 +96,7 @@ fn check_authorization(connection: &diesel::SqliteConnection, authorization_toke
 
 fn new_jwt(shared_key: &String, uuid: &String, token_lifetime: &i64) -> Result<String, jwt::Error> {
     // Create new HMAC key with shared key
-    let key: Hmac<Sha256> = Hmac::new_varkey(&format!("{}", shared_key).into_bytes()).unwrap();
+    let key: Hmac<Sha256> = Hmac::new_from_slice(&format!("{}", shared_key).into_bytes()).unwrap();
     // Add UUID into token
     let mut claims = BTreeMap::new();
     claims.insert("uuid", uuid);
@@ -109,7 +109,7 @@ fn new_jwt(shared_key: &String, uuid: &String, token_lifetime: &i64) -> Result<S
 
 fn check_jwt(shared_key: &String, jwt_token: &String) -> Result<(), ()> {
     // Create new HMAC key with shared key
-    let key: Hmac<Sha256> = Hmac::new_varkey(&format!("{}", shared_key).into_bytes()).unwrap();
+    let key: Hmac<Sha256> = Hmac::new_from_slice(&format!("{}", shared_key).into_bytes()).unwrap();
     // Verify token with shared key
     let claims: BTreeMap<String, String> = jwt_token.verify_with_key(&key).map_err(|_| ())?;
     let expiration_date = Utc.datetime_from_str(&claims["exp"], "%s").map_err(|_|())?;
