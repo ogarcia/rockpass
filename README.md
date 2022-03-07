@@ -132,7 +132,7 @@ export ROCKET_DATABASES='{rockpass = { url = "/location/of/rockpass.sqlite" }}'
 rockpass
 ```
 
-Finally if you want to execute the server witout database (for testing) you
+Finally if you want to execute the server without database (for testing) you
 can configure `url` as `:memory:`.
 ```
 ROCKET_DATABASES='{rockpass = { url = ":memory:" }}' rockpass
@@ -141,6 +141,29 @@ ROCKET_DATABASES='{rockpass = { url = ":memory:" }}' rockpass
 [4]: https://rocket.rs/v0.4/guide/configuration/
 
 ## Known limitations
+
+### Password reset
+
+With the premise in mind of keeping the code simple (remember that it is for
+personal use), Rockpass has not implemented any password reset API. But if
+any user does not remember their password you can reset it to a default
+value. For example, to reset the user _user@example.com_ password.
+
+1. _Connect_ to database.
+  ```sh
+  sqlite3 /location/of/rockpass.sqlite
+  ```
+2. Update password to a default `123456` value.
+   ```sql
+   UPDATE users SET
+    password='$2b$10$jJXcsuftQI9PwF8eqZo4/ObfBGbc.nhLBpV49fC4qeLLeh/Uz0YzW'
+   WHERE email = 'user@example.com';
+   ```
+
+Now you can login with your username `user@example.com` and `123456` as
+password. Don't forget to change it after login!
+
+### Delete an user
 
 For now, user deletion cannot be done via API. If you want to delete an user
 you can do it with `sqlite` command. For example to delete user
