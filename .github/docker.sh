@@ -11,7 +11,7 @@ apk -U --no-progress upgrade
 
 # install build deps
 apk --no-progress add build-base curl openssl openssl-dev sqlite-dev
-curl https://sh.rustup.rs -sSf | sh -s -- -q -y --default-toolchain nightly-2022-01-01
+curl https://sh.rustup.rs -sSf | sh -s -- -q -y --default-toolchain 1.59.0
 
 # build rockpass
 cd /rockpass/src

@@ -13,7 +13,7 @@ pub struct AuthorizedUser {
     pub id: i32,
     pub email: String,
     pub password: String,
-    pub token: String
+    pub token_id: i32
 }
 
 #[derive(Serialize, Deserialize, Queryable)]
@@ -44,7 +44,8 @@ pub struct JWTRefreshToken {
 pub struct DBToken {
     pub id: i32,
     pub user_id: i32,
-    pub token: String,
+    pub access_token: String,
+    pub refresh_token: String,
     pub created: NaiveDateTime,
     pub modified: NaiveDateTime
 }
@@ -66,7 +67,7 @@ pub struct Password {
     pub modified: NaiveDateTime
 }
 
-#[derive(Serialize, Deserialize, Insertable, AsChangeset)]
+#[derive(Clone, Serialize, Deserialize, Insertable, AsChangeset)]
 #[table_name="passwords"]
 pub struct NewPassword {
     pub login: String,

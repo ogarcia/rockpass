@@ -10,18 +10,17 @@ use chrono::prelude::*;
 use diesel::{self, prelude::*};
 use hmac::{Hmac, Mac};
 use jwt::{Header, SignWithKey, Token, VerifyWithKey};
-use rocket::{Outcome, State};
+use rocket::State;
 use rocket::http::Status;
-use rocket::request::{self, Request, FromRequest};
+use rocket::request::{Outcome, Request, FromRequest};
 use rocket::response::status;
-use rocket::response::Response;
-use rocket_contrib::json::{Json, JsonValue};
+use rocket::serde::json::{Json, Value, json};
 use sha2::Sha256;
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use crate::models::{AuthorizedUser, NewUser, NewUserPassword, User, JWTRefreshToken, DBToken, NewPassword, Password};
-use crate::{RockpassDatabase, RegistrationEnabled, TokenLifetime};
+use crate::{RockpassDatabase, RockpassConfig};
 use crate::schema::passwords::dsl::*;
 use crate::schema::tokens::dsl::*;
 use crate::schema::users::dsl::*;
@@ -38,10 +37,11 @@ pub enum AuthorizationError {
     Invalid
 }
 
-impl<'a, 'r> FromRequest<'a, 'r> for Authorization {
+#[rocket::async_trait]
+impl<'r> FromRequest<'r> for Authorization {
     type Error = AuthorizationError;
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
+    async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         // Seek for authorization header
         match request.headers().get_one("authorization") {
             None => Outcome::Failure((Status::BadRequest, AuthorizationError::Missing)),
@@ -49,9 +49,9 @@ impl<'a, 'r> FromRequest<'a, 'r> for Authorization {
                 // Authorization must start with 'bearer'
                 if (auth.len() > 7) && (&auth[..6].to_lowercase()) == "bearer" {
                     // Get database connection
-                    let connection = request.guard::<RockpassDatabase>().expect("database connection");
+                    let connection = request.guard::<RockpassDatabase>().await.expect("database connection");
                     // Check the autorization token (remove 'bearer' and pass JWT token only)
-                    match check_authorization(&connection, &auth[7..]) {
+                    match check_authorization(&connection, &auth[7..]).await {
                         Ok(authorized_user) => Outcome::Success(Authorization(connection, authorized_user)),
                         Err(_) => Outcome::Failure((Status::BadRequest, AuthorizationError::Invalid))
                     }
@@ -63,36 +63,72 @@ impl<'a, 'r> FromRequest<'a, 'r> for Authorization {
     }
 }
 
-fn check_authorization(connection: &diesel::SqliteConnection, authorization_token: &str) -> Result<AuthorizedUser, ()> {
-    // Parse provided token
-    let jwt_token: Token<Header, BTreeMap<String, String>, _> = Token::parse_unverified(authorization_token).map_err(|_| ())?;
-    let claims = jwt_token.claims();
+async fn check_authorization(connection: &RockpassDatabase, authorization_access_token: &str) -> Result<AuthorizedUser, ()> {
+    // Get UUID value from authorization token
+    let uuid = get_uuid_from_token(&authorization_access_token)?;
     // Seek for UUID field in database
-    match tokens.filter(token.eq(&claims["uuid"])).load::<DBToken>(connection) {
+    match connection.run(move |c| {
+        tokens::table
+            .filter(tokens::access_token.eq(&uuid))
+            .load::<DBToken>(c)
+    }).await {
         Ok(tokens_vector) => {
-            if tokens_vector.len() == 0 {
-                // No UUID token found
-                return Err(());
-            }
-            // Seek for user in database
-            match users.find(&tokens_vector[0].user_id).first::<User>(connection) {
-                Ok(users_vector) => {
-                    // Check JWT token with shared key and return authorized user
-                    check_jwt(&users_vector.password, &authorization_token.to_string()).
-                        map(|_| Ok(AuthorizedUser {
-                            id: users_vector.id,
-                            email: users_vector.email,
-                            password: users_vector.password,
-                            token: format!("{}", tokens_vector[0].token)
-                        }))?
-                },
-                Err(_) => Err(())
-            }
+            // Validate token and get authorized user
+            get_authorized_user(&connection, &tokens_vector, &authorization_access_token).await
         },
         Err(_) => Err(())
     }
 }
 
+async fn check_refresh(connection: &RockpassDatabase, payload_refresh_token: &str) -> Result<AuthorizedUser, ()> {
+    // Get UUID value from refresh token
+    let uuid = get_uuid_from_token(&payload_refresh_token)?;
+    // Seek for UUID field in database
+    match connection.run(move |c| {
+        tokens::table
+            .filter(tokens::refresh_token.eq(&uuid))
+            .load::<DBToken>(c)
+    }).await {
+        Ok(tokens_vector) => {
+            // Validate token and get authorized user
+            get_authorized_user(&connection, &tokens_vector, &payload_refresh_token).await
+        },
+        Err(_) => Err(())
+    }
+}
+
+async fn get_authorized_user(connection: &RockpassDatabase, tokens_vector: &Vec<DBToken>, token: &str) -> Result<AuthorizedUser, ()> {
+    if tokens_vector.len() == 0 {
+        // No UUID token found
+        return Err(());
+    }
+    // Seek for user in database
+    let token_user_id = tokens_vector[0].user_id;
+    match connection.run(move |c| {
+        users::table
+            .find(&token_user_id)
+            .first::<User>(c)
+    }).await {
+        Ok(users_vector) => {
+            // Check JWT token with shared key and return authorized user
+            check_jwt(&users_vector.password, &token.to_string()).
+                map(|_| Ok(AuthorizedUser {
+                    id: users_vector.id,
+                    email: users_vector.email,
+                    password: users_vector.password,
+                    token_id: tokens_vector[0].id
+                }))?
+        },
+        Err(_) => Err(())
+    }
+}
+
+fn get_uuid_from_token(token: &str) -> Result<String, ()> {
+    // Parse provided token and return UUID
+    let jwt_token: Token<Header, BTreeMap<String, String>, _> = Token::parse_unverified(token).map_err(|_| ())?;
+    let claims = jwt_token.claims();
+    Ok(claims["uuid"].to_string())
+}
 
 fn new_jwt(shared_key: &String, uuid: &String, token_lifetime: &i64) -> Result<String, jwt::Error> {
     // Create new HMAC key with shared key
@@ -120,63 +156,76 @@ fn check_jwt(shared_key: &String, jwt_token: &String) -> Result<(), ()> {
     }
 }
 
-fn create_token(connection: &diesel::SqliteConnection, user: &User, token_lifetime: &i64) -> Result<String, ()> {
-    // Make new UUID for user token
-    let uuid = Uuid::new_v4().to_string();
-    // Calculate new JWT token
-    let jwt = new_jwt(&user.password, &uuid, &token_lifetime).map_err(|_| ())?;
+async fn create_tokens(connection: &RockpassDatabase, user: &User, access_token_lifetime: &i64, refresh_token_lifetime: &i64) -> Result<(String, String), ()> {
+    // Make new UUIDs for access and refresh tokens
+    let access_token_uuid = Uuid::new_v4().to_string();
+    let refresh_token_uuid = Uuid::new_v4().to_string();
+    // Calculate new JWT tokens
+    let access_token_jwt = new_jwt(&user.password, &access_token_uuid, &access_token_lifetime).map_err(|_| ())?;
+    let refresh_token_jwt = new_jwt(&user.password, &refresh_token_uuid, &refresh_token_lifetime).map_err(|_| ())?;
     // Insert it into database
-    match diesel::insert_into(tokens)
-        .values((tokens::user_id.eq(&user.id), token.eq(&uuid)))
-        .execute(connection) {
-            Ok(rows) => {
-                match rows {
-                    0 => Err(()),
-                    // Return the new JWT token
-                    _ => Ok(jwt)
-                }
-            },
-            Err(_) => Err(())
-        }
+    let token_user_id = user.id;
+    match connection.run(move |c| {
+        diesel::insert_into(tokens::table)
+            .values((tokens::user_id.eq(&token_user_id), access_token.eq(&access_token_uuid), refresh_token.eq(&refresh_token_uuid)))
+            .execute(c)
+    }).await {
+        Ok(rows) => {
+            match rows {
+                0 => Err(()),
+                // Return the new JWT tokens
+                _ => Ok((access_token_jwt, refresh_token_jwt))
+            }
+        },
+        Err(_) => Err(())
+    }
 }
 
-fn refresh_token(connection: &diesel::SqliteConnection, authorized_user: &AuthorizedUser, token_lifetime: &i64) -> Result<String, ()> {
-    // Make new UUID for user token
-    let uuid = Uuid::new_v4().to_string();
-    // Calculate new JWT token
-    let jwt = new_jwt(&authorized_user.password, &uuid, &token_lifetime).map_err(|_| ())?;
+async fn refresh_tokens(connection: &RockpassDatabase, authorized_user: &AuthorizedUser, access_token_lifetime: &i64, refresh_token_lifetime: &i64) -> Result<(String, String), ()> {
+    // Make new UUIDs for access and refresh tokens
+    let access_token_uuid = Uuid::new_v4().to_string();
+    let refresh_token_uuid = Uuid::new_v4().to_string();
+    // Calculate new JWT tokens
+    let access_token_jwt = new_jwt(&authorized_user.password, &access_token_uuid, &access_token_lifetime).map_err(|_| ())?;
+    let refresh_token_jwt = new_jwt(&authorized_user.password, &refresh_token_uuid, &refresh_token_lifetime).map_err(|_| ())?;
     // Insert it into database
-    match diesel::update(tokens)
-        .filter(token.eq(&authorized_user.token))
-        .set((token.eq(&uuid), tokens::modified.eq(Utc::now().format("%Y-%m-%d %H:%M:%S").to_string())))
-        .execute(connection) {
-            Ok(rows) => {
-                match rows {
-                    0 => Err(()),
-                    // Return the new JWT token
-                    _ => Ok(jwt)
-                }
-            },
-            Err(_) => Err(())
-        }
+    let token_id = authorized_user.token_id;
+    match connection.run(move |c| {
+        diesel::update(tokens)
+            .filter(tokens::id.eq(&token_id))
+            .set((access_token.eq(&access_token_uuid), refresh_token.eq(&refresh_token_uuid), tokens::modified.eq(Utc::now().format("%Y-%m-%d %H:%M:%S").to_string())))
+            .execute(c)
+    }).await {
+        Ok(rows) => {
+            match rows {
+                0 => Err(()),
+                // Return the new JWT tokens
+                _ => Ok((access_token_jwt, refresh_token_jwt))
+            }
+        },
+        Err(_) => Err(())
+    }
 }
 
 #[options("/auth/users")]
-pub fn options_auth_users<'a>() -> Response<'a> {
-    Response::build().status(Status::NoContent).finalize()
+pub async fn options_auth_users() -> Status {
+    Status::NoContent
 }
 
 #[post("/auth/users", data = "<user>")]
-pub fn post_auth_users(connection: RockpassDatabase, registration_enabled: State<RegistrationEnabled>, user: Json<NewUser>) -> status::Custom<Json<JsonValue>> {
-    if registration_enabled.0 {
+pub async fn post_auth_users(connection: RockpassDatabase, config: &State<RockpassConfig>, user: Json<NewUser>) -> status::Custom<Json<Value>> {
+    if config.registration_enabled {
         // Register new user
+        let new_user_email = user.0.email.clone();
         let bcrypted_password = hash(&user.0.password, BCRYPT_COST).unwrap();
-        let inserted_rows = match diesel::insert_into(users)
-            .values((email.eq(&user.0.email), password.eq(bcrypted_password)))
-            .execute(&connection.0) {
-                Ok(rows) => rows,
-                Err(_) => 0
-            };
+        let inserted_rows = match connection.run(move |c| {
+            diesel::insert_into(users)
+                .values((email.eq(&new_user_email), password.eq(bcrypted_password)))
+                .execute(c)
+        }).await {
+            Ok(rows) => rows,
+            Err(_) => 0
+        };
         match inserted_rows {
             0 => status::Custom(Status::Conflict, Json(json!({"detail": "User already exists"}))),
             _ => status::Custom(Status::Created, Json(json!({"detail": format!("Created {} user", user.0.email)})))
@@ -187,33 +236,38 @@ pub fn post_auth_users(connection: RockpassDatabase, registration_enabled: State
 }
 
 #[options("/auth/users/set_password")]
-pub fn options_auth_users_set_password<'a>() -> Response<'a> {
-    Response::build().status(Status::NoContent).finalize()
+pub async fn options_auth_users_set_password() -> Status {
+    Status::NoContent
 }
 
 #[post("/auth/users/set_password", data = "<new_user_password>")]
-pub fn post_auth_users_set_password(authorization: Authorization, new_user_password: Json<NewUserPassword>) -> status::Custom<Json<JsonValue>> {
+pub async fn post_auth_users_set_password(authorization: Authorization, new_user_password: Json<NewUserPassword>) -> status::Custom<Json<Value>> {
     if verify(&new_user_password.0.current_password, &authorization.1.password).unwrap() {
         let connection = authorization.0;
+        let authorized_user_id = authorization.1.id;
         let bcrypted_password = hash(&new_user_password.0.new_password, BCRYPT_COST).unwrap();
         // Change user password
-        let updated_rows = match diesel::update(users)
-            .filter(users::id.eq(&authorization.1.id))
-            .set(password.eq(bcrypted_password))
-            .execute(&connection.0) {
-                Ok(rows) => rows,
-                Err(_) => 0
-            };
+        let updated_rows = match connection.run(move |c| {
+            diesel::update(users)
+                .filter(users::id.eq(&authorized_user_id))
+                .set(password.eq(bcrypted_password))
+                .execute(c)
+        }).await {
+            Ok(rows) => rows,
+            Err(_) => 0
+        };
         match updated_rows {
             0 => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem updating the password"}))),
             _ => {
                 // Delete all user tokens after password change
-                let deleted_rows = match diesel::delete(tokens)
-                    .filter(tokens::user_id.eq(&authorization.1.id))
-                    .execute(&connection.0) {
-                        Ok(rows) => rows,
-                        Err(_) => 0
-                    };
+                let deleted_rows = match connection.run(move |c| {
+                    diesel::delete(tokens)
+                        .filter(tokens::user_id.eq(&authorized_user_id))
+                        .execute(c)
+                }).await {
+                    Ok(rows) => rows,
+                    Err(_) => 0
+                };
                 status::Custom(Status::Ok, Json(json!({"detail": format!("Passwod changed for user {} and deleted {} old tokens", authorization.1.email, deleted_rows)})))
             }
         }
@@ -223,50 +277,55 @@ pub fn post_auth_users_set_password(authorization: Authorization, new_user_passw
 }
 
 #[options("/auth/jwt/create")]
-pub fn options_auth_jwt_create<'a>() -> Response<'a> {
-    Response::build().status(Status::NoContent).finalize()
+pub async fn options_auth_jwt_create() -> Status {
+    Status::NoContent
 }
 
 #[post("/auth/jwt/create", data = "<user>")]
-pub fn post_auth_jwt_create(connection: RockpassDatabase, token_lifetime: State<TokenLifetime>, user: Json<NewUser>) -> status::Custom<Json<JsonValue>> {
+pub async fn post_auth_jwt_create(connection: RockpassDatabase, config: &State<RockpassConfig>, user: Json<NewUser>) -> status::Custom<Json<Value>> {
     // Seek for user in database
-    let results: Vec<User> = users.filter(email.eq(&user.0.email))
-        .limit(1)
-        .load::<User>(&connection.0)
-        .expect("load user");
+    let user_email = user.0.email;
+    let results: Vec<User> = connection.run(move |c| {
+        users::table
+            .filter(email.eq(&user_email))
+            .limit(1)
+            .load::<User>(c)
+    }).await.expect("load user");
     // If user found verify password
     if (results.len() == 0) || (! verify(&user.0.password, &results[0].password).unwrap()) {
         return status::Custom(Status::Unauthorized, Json(json!({"detail": "No active account found with the given credentials"})));
     }
     // Generate new token
-    match create_token(&connection.0, &results[0], &token_lifetime.0) {
+    match create_tokens(&connection, &results[0], &config.access_token_lifetime, &config.refresh_token_lifetime).await {
         Ok(created_token) => {
             // Delete expired tokens after login
-            let min_modification_date = Utc::now() - Duration::seconds(token_lifetime.0);
-            diesel::delete(tokens)
-                .filter(tokens::user_id.eq(&results[0].id))
-                .filter(tokens::modified.lt(min_modification_date.format("%Y-%m-%d %H:%M:%S").to_string()))
-                .execute(&connection.0)
-                .expect("delete expired tokens");
-            status::Custom(Status::Created, Json(json!({"access": created_token, "refresh": created_token})))
+            let min_modification_date = Utc::now() - Duration::seconds(config.refresh_token_lifetime);
+            let token_user_id = results[0].id;
+            connection.run(move |c| {
+                diesel::delete(tokens::table)
+                    .filter(tokens::user_id.eq(&token_user_id))
+                    .filter(tokens::modified.lt(min_modification_date.format("%Y-%m-%d %H:%M:%S").to_string()))
+                    .execute(c)
+            }).await.expect("delete expired tokens");
+            status::Custom(Status::Created, Json(json!({"access": created_token.0, "refresh": created_token.1})))
         },
         Err(()) => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem generating the new token"})))
     }
 }
 
 #[options("/auth/jwt/refresh")]
-pub fn options_auth_jwt_refresh<'a>() -> Response<'a> {
-    Response::build().status(Status::NoContent).finalize()
+pub async fn options_auth_jwt_refresh() -> Status {
+    Status::NoContent
 }
 
 #[post("/auth/jwt/refresh", data = "<jwt_refresh_token>")]
-pub fn post_auth_jwt_refresh(connection: RockpassDatabase, token_lifetime: State<TokenLifetime>, jwt_refresh_token: Json<JWTRefreshToken>) -> status::Custom<Json<JsonValue>> {
+pub async fn post_auth_jwt_refresh(connection: RockpassDatabase, config: &State<RockpassConfig>, jwt_refresh_token: Json<JWTRefreshToken>) -> status::Custom<Json<Value>> {
     // Check the refresh token
-    match check_authorization(&connection, &jwt_refresh_token.0.refresh) {
+    match check_refresh(&connection, &jwt_refresh_token.0.refresh).await {
         Ok(authorized_user) => {
             // Generate new token
-            match refresh_token(&connection, &authorized_user, &token_lifetime.0) {
-                Ok(refreshed_token) => status::Custom(Status::Created, Json(json!({"access": refreshed_token, "refresh": refreshed_token}))),
+            match refresh_tokens(&connection, &authorized_user, &config.access_token_lifetime, &config.refresh_token_lifetime).await {
+                Ok(refreshed_token) => status::Custom(Status::Created, Json(json!({"access": refreshed_token.0, "refresh": refreshed_token.1}))),
                 Err(()) => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem generating the new token"})))
             }
         },
@@ -275,17 +334,20 @@ pub fn post_auth_jwt_refresh(connection: RockpassDatabase, token_lifetime: State
 }
 
 #[options("/passwords")]
-pub fn options_passwords<'a>() -> Response<'a> {
-    Response::build().status(Status::NoContent).finalize()
+pub async fn options_passwords() -> Status {
+    Status::NoContent
 }
 
 #[get("/passwords")]
-pub fn get_passwords(authorization: Authorization) -> status::Custom<Json<JsonValue>> {
+pub async fn get_passwords(authorization: Authorization) -> status::Custom<Json<Value>> {
     let connection = authorization.0;
     // Seek for passwords in database
-    let results: Vec<Password> = passwords.filter(passwords::user_id.eq(&authorization.1.id))
-          .load::<Password>(&connection.0)
-          .expect("load passwords");
+    let authorized_user_id = authorization.1.id;
+    let results: Vec<Password> = connection.run(move |c| {
+        passwords::table
+            .filter(passwords::user_id.eq(&authorized_user_id))
+            .load::<Password>(c)
+    }).await.expect("load passwords");
     status::Custom(Status::Ok, Json(
             json!({
                 "count": results.len(),
@@ -295,15 +357,19 @@ pub fn get_passwords(authorization: Authorization) -> status::Custom<Json<JsonVa
 }
 
 #[post("/passwords", data = "<new_password>")]
-pub fn post_passwords(authorization: Authorization, new_password: Json<NewPassword>) -> status::Custom<Json<JsonValue>> {
+pub async fn post_passwords(authorization: Authorization, new_password: Json<NewPassword>) -> status::Custom<Json<Value>> {
     let connection = authorization.0;
     // Insert new pasword in database
-    let inserted_rows = match diesel::insert_into(passwords)
-        .values((passwords::user_id.eq(&authorization.1.id), &new_password.0))
-        .execute(&connection.0) {
-            Ok(rows) => rows,
-            Err(_) => 0
-        };
+    let authorized_user_id = authorization.1.id;
+    let new_password_to_insert = new_password.0.clone();
+    let inserted_rows = match connection.run(move |c| {
+        diesel::insert_into(passwords)
+            .values((passwords::user_id.eq(&authorized_user_id), &new_password_to_insert))
+            .execute(c)
+    }).await {
+        Ok(rows) => rows,
+        Err(_) => 0
+    };
     match inserted_rows {
         0 => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem creating the new password entry"}))),
         _ => status::Custom(Status::Created, Json(json!({"detail": format!("Created new password entry for site {}", new_password.0.site)})))
@@ -311,22 +377,26 @@ pub fn post_passwords(authorization: Authorization, new_password: Json<NewPasswo
 }
 
 #[options("/passwords/<_password_id>")]
-pub fn options_passwords_id<'a>(_password_id: i32) -> Response<'a> {
-    Response::build().status(Status::NoContent).finalize()
+pub async fn options_passwords_id(_password_id: i32) -> Status {
+    Status::NoContent
 }
 
 #[put("/passwords/<updated_password_id>", data = "<updated_password>")]
-pub fn put_passwords_id(authorization: Authorization, updated_password_id: i32, updated_password: Json<NewPassword>) -> status::Custom<Json<JsonValue>> {
+pub async fn put_passwords_id(authorization: Authorization, updated_password_id: i32, updated_password: Json<NewPassword>) -> status::Custom<Json<Value>> {
     let connection = authorization.0;
     // Update existing password
-    let updated_rows = match diesel::update(passwords)
-        .filter(passwords::id.eq(updated_password_id))
-        .filter(passwords::user_id.eq(&authorization.1.id))
-        .set((&updated_password.0, passwords::modified.eq(Utc::now().format("%Y-%m-%d %H:%M:%S").to_string())))
-        .execute(&connection.0) {
-            Ok(rows) => rows,
-            Err(_) => 0
-        };
+    let authorized_user_id = authorization.1.id;
+    let updated_password_to_insert = updated_password.0.clone();
+    let updated_rows = match connection.run(move |c| {
+        diesel::update(passwords)
+            .filter(passwords::id.eq(updated_password_id))
+            .filter(passwords::user_id.eq(&authorized_user_id))
+            .set((&updated_password_to_insert, passwords::modified.eq(Utc::now().format("%Y-%m-%d %H:%M:%S").to_string())))
+        .execute(c)
+    }).await {
+        Ok(rows) => rows,
+        Err(_) => 0
+    };
     match updated_rows {
         0 => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem updating the password entry"}))),
         _ => status::Custom(Status::Created, Json(json!({"detail": format!("Updated password entry for site {}", updated_password.0.site)})))
@@ -334,16 +404,19 @@ pub fn put_passwords_id(authorization: Authorization, updated_password_id: i32, 
 }
 
 #[delete("/passwords/<deleted_password_id>")]
-pub fn delete_passwords_id(authorization: Authorization, deleted_password_id: i32) -> status::Custom<Json<JsonValue>> {
+pub async fn delete_passwords_id(authorization: Authorization, deleted_password_id: i32) -> status::Custom<Json<Value>> {
     let connection = authorization.0;
     // Delete existing password
-    let deleted_rows = match diesel::delete(passwords)
-        .filter(passwords::id.eq(deleted_password_id))
-        .filter(passwords::user_id.eq(&authorization.1.id))
-        .execute(&connection.0) {
-            Ok(rows) => rows,
-            Err(_) => 0
-        };
+    let authorized_user_id = authorization.1.id;
+    let deleted_rows = match connection.run(move |c| {
+        diesel::delete(passwords)
+            .filter(passwords::id.eq(deleted_password_id))
+            .filter(passwords::user_id.eq(&authorized_user_id))
+            .execute(c)
+    }).await {
+        Ok(rows) => rows,
+        Err(_) => 0
+    };
     match deleted_rows {
         0 => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem deleting the password entry"}))),
         _ => status::Custom(Status::Ok, Json(json!({"detail": format!("Deleted password with id {}", deleted_password_id)})))

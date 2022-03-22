@@ -20,7 +20,8 @@ table! {
     tokens (id) {
         id -> Integer,
         user_id -> Integer,
-        token -> Text,
+        access_token -> Text,
+        refresh_token -> Text,
         created -> Timestamp,
         modified -> Timestamp,
     }

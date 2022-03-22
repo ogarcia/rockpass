@@ -4,15 +4,16 @@
 // Distributed under terms of the GNU GPLv3 license.
 //
 
-#![feature(proc_macro_hygiene, decl_macro)]
+//#![feature(proc_macro_hygiene, decl_macro)]
 
 #[macro_use] extern crate diesel;
 #[macro_use] extern crate diesel_migrations;
 #[macro_use] extern crate rocket;
-#[macro_use] extern crate rocket_contrib;
+#[macro_use] extern crate rocket_sync_db_pools;
 
+use serde::Deserialize;
 use rocket::fairing::AdHoc;
-use rocket::Rocket;
+use rocket::{Rocket, Build};
 
 mod cors;
 mod models;
@@ -22,36 +23,36 @@ mod schema;
 #[database("rockpass")]
 pub struct RockpassDatabase(diesel::SqliteConnection);
 
-fn database_migrations(rocket: Rocket) -> Result<Rocket, Rocket> {
+async fn database_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
     embed_migrations!();
 
-    let connection = RockpassDatabase::get_one(&rocket).expect("database connection");
-    match embedded_migrations::run(&*connection) {
-        Ok(()) => Ok(rocket),
-        Err(_) => Err(rocket)
-    }
+    let connection = RockpassDatabase::get_one(&rocket).await.expect("database connection");
+    connection.run(|c| embedded_migrations::run(c)).await.expect("diesel migrations");
+
+    rocket
 }
 
-pub struct RegistrationEnabled(bool);
-pub struct TokenLifetime(i64);
+#[derive(Deserialize)]
+pub struct RockpassConfig {
+    #[serde(default = "default_registration_enabled")]
+    registration_enabled: bool,
+    #[serde(default = "default_access_token_lifetime")]
+    access_token_lifetime: i64,
+    #[serde(default = "default_refresh_token_lifetime")]
+    refresh_token_lifetime: i64
+}
 
-fn main() {
-    rocket::ignite()
+fn default_registration_enabled() -> bool { true }
+fn default_access_token_lifetime() -> i64 { 3600 }
+fn default_refresh_token_lifetime() -> i64 { 2592000 }
+
+#[launch]
+fn rocket() -> _ {
+    rocket::build()
         .attach(cors::Cors)
         .attach(RockpassDatabase::fairing())
-        .attach(AdHoc::on_attach("Database Migrations", database_migrations))
-        .attach(AdHoc::on_attach("Registration config", |rocket| {
-            let registration_enabled = rocket.config()
-                .get_bool("registration_enabled")
-                .unwrap_or(true);
-            Ok(rocket.manage(RegistrationEnabled(registration_enabled)))
-        }))
-        .attach(AdHoc::on_attach("Token lifetime config", |rocket| {
-            let token_lifetime = rocket.config()
-                .get_int("token_lifetime")
-                .unwrap_or(2592000);
-            Ok(rocket.manage(TokenLifetime(token_lifetime)))
-        }))
+        .attach(AdHoc::config::<RockpassConfig>())
+        .attach(AdHoc::on_ignite("Database Migrations", database_migrations))
         .mount("/", routes![
                routes::options_auth_users,
                routes::post_auth_users,
@@ -68,5 +69,4 @@ fn main() {
                routes::put_passwords_id,
                routes::delete_passwords_id
         ])
-        .launch();
 }

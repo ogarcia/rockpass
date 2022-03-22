@@ -62,26 +62,25 @@ chown -R 100:100 /my/rockpass
 | Variable | Used for | Default value |
 | --- | --- | --- |
 | `ROCKET_DATABASES` | Database location | {rockpass = { url = \"/var/lib/rockpass/rockpass.sqlite\" }} |
-| `ROCKET_SECRET_KEY` | Unused, but need to be defined to something to avoid warnings | fIdKuZfnI2oUJg4HMrKB7RTXxXS5B2Yw9D5RpOaKciI= |
 | `ROCKET_ADDRESS` | Listen address | 0.0.0.0 |
 | `ROCKET_PORT` | Listen port | 8000 |
 | `ROCKET_REGISTRATION_ENABLED` | Enable or disable the ability to register new users | true |
-| `ROCKET_TOKEN_LIFETIME` | Time, in seconds, that the login token is valid | 2592000 (30 days) |
-| `ROCKET_LOG` | Log level | normal |
+| `ROCKET_ACCESS_TOKEN_LIFETIME` | Time, in seconds, that the access token is valid | 3600 (1 hour) |
+| `ROCKET_REFRESH_TOKEN_LIFETIME` | Time, in seconds, that the refresh token is valid | 2592000 (30 days) |
+| `ROCKET_LOG_LEVEL` | Log level | normal |
 
 ### From source
 
 #### Installing Rust
 
-Rockpass is based in [Rocket][3] so you need to use a nightly version of
-Rust.
+Rockpass is based in [Rocket][3] v0.5 so you can use stable version of Rust.
 ```
-rustup default nightly
+rustup default stable
 ```
 
-If you prefer, you can use the nightly version only for install Rockpass.
+If you prefer, you can use the stable version only for install Rockpass.
 ```
-rustup override set nightly
+rustup override set stable
 ```
 
 [3]: https://rocket.rs/
@@ -101,12 +100,13 @@ After build the binary is located in `target/release/rockpass`.
 
 Since Rockpass is based in Rocket, the config is same that is detailed in
 [Rocket documentation][4]. Anyway a `Rocket.toml.example` is provided with
-comments and the interesting field are the following.
+comments and the interesting fields are the following.
 
 | Setting | Use | Default value |
 | --- | --- | --- |
 | `registration_enabled` | Enable or disable the ability to register new users | true |
-| `token_lifetime` | Time, in seconds, that the login token is valid | 2592000 (30 days) |
+| `access_token_lifetime` | Time, in seconds, that the access token is valid | 3600 (1 hour) |
+| `refresh_token_lifetime` | Time, in seconds, that the refresh token is valid | 2592000 (30 days) |
 | `rockpass` | SQLite database location (see below) | |
 
 The database configuration can be detailed in two options.

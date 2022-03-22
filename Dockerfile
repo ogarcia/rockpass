@@ -12,12 +12,12 @@ RUN apk -U --no-progress upgrade && \
 COPY --from=builder /rockpass/pkg /
 EXPOSE 8000
 ENV ROCKET_DATABASES="{rockpass = { url = \"/var/lib/rockpass/rockpass.sqlite\" }}" \
-    ROCKET_SECRET_KEY="fIdKuZfnI2oUJg4HMrKB7RTXxXS5B2Yw9D5RpOaKciI=" \
     ROCKET_ADDRESS="0.0.0.0" \
     ROCKET_PORT=8000 \
     ROCKET_REGISTRATION_ENABLED=true \
-    ROCKET_TOKEN_LIFETIME=2592000 \
-    ROCKET_LOG=normal
+    ROCKET_ACCESS_TOKEN_LIFETIME=3600 \
+    ROCKET_REFRESH_TOKEN_LIFETIME=2592000 \
+    ROCKET_LOG_LEVEL=normal
 VOLUME [ "/var/lib/rockpass" ]
 USER rockpass
 ENTRYPOINT [ "/bin/rockpass" ]
