@@ -35,7 +35,7 @@ Warning: this is a basic run, all data will be destroyed after container
 stop and rm.
 
 [ghcr]: https://github.com/users/ogarcia/packages/container/package/rockpass
-[hub]: https://hub.docker.com/repository/docker/ogarcia/rockpass
+[hub]: https://hub.docker.com/r/ogarcia/rockpass
 
 #### Persist data using a Docker volume
 
