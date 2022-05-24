@@ -16,7 +16,7 @@ curl https://sh.rustup.rs -sSf | sh -s -- -q -y --default-toolchain 1.59.0
 # build rockpass
 cd /rockpass/src
 source $HOME/.cargo/env
-RUSTFLAGS="-C target-feature=-crt-static" cargo build --release --locked --all-features
+RUSTFLAGS="-C target-feature=-crt-static" cargo build --release --locked
 
 # package rockpass
 install -Dm755 "target/release/rockpass" \

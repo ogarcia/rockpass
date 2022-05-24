@@ -1,6 +1,6 @@
 //
 // main.rs
-// Copyright (C) 2021 Óscar García Amor <ogarcia@connectical.com>
+// Copyright (C) 2021-2022 Óscar García Amor <ogarcia@connectical.com>
 // Distributed under terms of the GNU GPLv3 license.
 //
 
@@ -13,9 +13,9 @@
 
 use serde::Deserialize;
 use rocket::fairing::AdHoc;
-use rocket::{Rocket, Build};
+use rocket::{http::ContentType, Rocket, Build};
 
-mod cors;
+mod fairings;
 mod models;
 mod routes;
 mod schema;
@@ -49,7 +49,8 @@ fn default_refresh_token_lifetime() -> i64 { 2592000 }
 #[launch]
 fn rocket() -> _ {
     rocket::build()
-        .attach(cors::Cors)
+        .attach(fairings::Cors)
+        .attach(fairings::ForceContentType(ContentType::JSON))
         .attach(RockpassDatabase::fairing())
         .attach(AdHoc::config::<RockpassConfig>())
         .attach(AdHoc::on_ignite("Database Migrations", database_migrations))
