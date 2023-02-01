@@ -1,0 +1,62 @@
+# You can have several different profiles and use ROCKPASS_PROFILE
+# environment variable to switch between them. By default release is used.
+# See https://rocket.rs/v0.5-rc/guide/configuration/#profiles for more info.
+#
+# All configuration parameters can also be set with environment variables.
+# For each parameter, the corresponding environment variable is indicated.
+# Note that all parameters are optional, if not defined the default values
+# are used.
+#
+# If you want to use this configuration file, copy it as /etc/rockpass.toml
+# or as rockpass.toml together with the executable file.
+[release]
+# Listen address. Default 127.0.0.1
+# Note that it is always better to put a web server like nginx in front
+# ROCKPASS_ADDRESS
+#address = "127.0.0.1"
+# Listen port. Default 8000
+# ROCKPASS_PORT
+#port = 8000
+# Log level, the valid values are `critical`, `normal`, `debug`, `off`, if
+# not defined the default value is off
+# ROCKPASS_LOG_LEVEL
+#log_level = "normal"
+# Set if new users can register or not. If you set to false only previous
+# registered users can login an use server. Default true
+# ROCKPASS_REGISTRATION_ENABLED
+#registration_enabled = true
+# Set the life time of access token in seconds. The user must request a new
+# access token with the refresh token after this time has elapsed. Default
+# 3600, (1 hour)
+# ROCKPASS_ACCESS_TOKEN_LIFETIME
+#access_token_lifetime = 3600
+# Set the life time of refresh token in seconds. If the user don't refresh
+# token in this time, must login again. Default 2592000 (30 days)
+# ROCKPASS_REFRESH_TOKEN_LIFETIME
+#refresh_token_lifetime = 2592000
+# Location of SQlite database. Default {rockpass={url=":memory:"}}
+# ROCKPASS_DATABASES
+#databases={rockpass={url="/tmp/rockpass.sqlite"}}
+
+# Production sample
+# Environment variable ROCKPASS_PROFILE must be set to pro to load it
+# export ROCKPASS_PROFILE=pro
+[pro]
+address = "127.0.0.1"
+port = 8000
+log_level = "critical"
+registration_enabled = true
+access_token_lifetime = 3600
+refresh_token_lifetime = 2592000
+databases={rockpass={url="/var/lib/rockpass/rockpass.sqlite"}}
+
+# Other sample
+[debug]
+address = "127.0.0.1"
+port = 9000
+log_level = "debug"
+registration_enabled = true
+access_token_lifetime = 3600
+refresh_token_lifetime = 2592000
+# Use database in memory
+databases={rockpass={url=":memory:"}}

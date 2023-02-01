@@ -1,4 +1,4 @@
-ARG ALPINE_VERSION=3.13.5
+ARG ALPINE_VERSION=3.17.1
 
 FROM alpine:${ALPINE_VERSION} AS builder
 COPY . /rockpass/src
@@ -11,13 +11,13 @@ RUN apk -U --no-progress upgrade && \
     rm -f /var/cache/apk/*
 COPY --from=builder /rockpass/pkg /
 EXPOSE 8000
-ENV ROCKET_DATABASES="{rockpass = { url = \"/var/lib/rockpass/rockpass.sqlite\" }}" \
-    ROCKET_ADDRESS="0.0.0.0" \
-    ROCKET_PORT=8000 \
-    ROCKET_REGISTRATION_ENABLED=true \
-    ROCKET_ACCESS_TOKEN_LIFETIME=3600 \
-    ROCKET_REFRESH_TOKEN_LIFETIME=2592000 \
-    ROCKET_LOG_LEVEL=normal
+ENV ROCKPASS_DATABASES="{rockpass={url=\"/var/lib/rockpass/rockpass.sqlite\"}}" \
+    ROCKPASS_ADDRESS="0.0.0.0" \
+    ROCKPASS_PORT=8000 \
+    ROCKPASS_REGISTRATION_ENABLED=true \
+    ROCKPASS_ACCESS_TOKEN_LIFETIME=3600 \
+    ROCKPASS_REFRESH_TOKEN_LIFETIME=2592000 \
+    ROCKPASS_LOG_LEVEL=critical
 VOLUME [ "/var/lib/rockpass" ]
 USER rockpass
 ENTRYPOINT [ "/bin/rockpass" ]

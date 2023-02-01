@@ -1138,7 +1138,7 @@ dependencies = [
 
 [[package]]
 name = "rockpass"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "base64",
  "bcrypt",
@@ -1149,7 +1149,6 @@ dependencies = [
  "jwt",
  "rocket",
  "rocket_sync_db_pools",
- "serde",
  "sha2",
  "uuid",
 ]

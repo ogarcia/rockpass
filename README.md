@@ -61,29 +61,31 @@ chown -R 100:100 /my/rockpass
 
 | Variable | Used for | Default value |
 | --- | --- | --- |
-| `ROCKET_DATABASES` | Database location | {rockpass = { url = \"/var/lib/rockpass/rockpass.sqlite\" }} |
-| `ROCKET_ADDRESS` | Listen address | 0.0.0.0 |
-| `ROCKET_PORT` | Listen port | 8000 |
-| `ROCKET_REGISTRATION_ENABLED` | Enable or disable the ability to register new users | true |
-| `ROCKET_ACCESS_TOKEN_LIFETIME` | Time, in seconds, that the access token is valid | 3600 (1 hour) |
-| `ROCKET_REFRESH_TOKEN_LIFETIME` | Time, in seconds, that the refresh token is valid | 2592000 (30 days) |
-| `ROCKET_LOG_LEVEL` | Log level | normal |
+| `ROCKPASS_DATABASES` | Database location | {rockpass={url="/var/lib/rockpass/rockpass.sqlite"}} |
+| `ROCKPASS_ADDRESS` | Listen address | 0.0.0.0 |
+| `ROCKPASS_PORT` | Listen port | 8000 |
+| `ROCKPASS_REGISTRATION_ENABLED` | Enable or disable the ability to register new users | true |
+| `ROCKPASS_ACCESS_TOKEN_LIFETIME` | Time, in seconds, that the access token is valid | 3600 (1 hour) |
+| `ROCKPASS_REFRESH_TOKEN_LIFETIME` | Time, in seconds, that the refresh token is valid | 2592000 (30 days) |
+| `ROCKPASS_LOG_LEVEL` | Log level | critical |
 
 ### From source
 
 #### Installing Rust
 
-Rockpass is based in [Rocket][3] v0.5 so you can use stable version of Rust.
+Rockpass build has been tested with current Rust stable release version. You
+can install Rust from your distribution package or use [`rustup`][rustup].
 ```
 rustup default stable
 ```
 
-If you prefer, you can use the stable version only for install Rockpass.
+If you prefer, you can use the stable version only for install Rockpass (you
+must clone the repository first).
 ```
 rustup override set stable
 ```
 
-[3]: https://rocket.rs/
+[rustup]: https://rustup.rs/
 
 #### Installing Rockpass
 
@@ -98,47 +100,171 @@ After build the binary is located in `target/release/rockpass`.
 
 ## Configuration
 
-Since Rockpass is based in Rocket, the config is same that is detailed in
-[Rocket documentation][4]. Anyway a `Rocket.toml.example` is provided with
-comments and the interesting fields are the following.
+How Rockpass uses [Rocket][rocket] certain configuration parameters are
+compatible with each other. You can look at the [Rocket configuration
+documentation][rcdoc] to see what the basic parameters are. In any case,
+a fully commented `rockpass.toml.example` is provided and the most important
+parameters are detailed below.
 
 | Setting | Use | Default value |
 | --- | --- | --- |
+| `address` | Listen address | 127.0.0.1 |
+| `port` | Listen port | 8000 |
 | `registration_enabled` | Enable or disable the ability to register new users | true |
 | `access_token_lifetime` | Time, in seconds, that the access token is valid | 3600 (1 hour) |
 | `refresh_token_lifetime` | Time, in seconds, that the refresh token is valid | 2592000 (30 days) |
-| `rockpass` | SQLite database location (see below) | |
+| `databases` | SQLite database location (see below) | {rockpass={url=":memory:"}} |
 
-The database configuration can be detailed in two options.
+The database configuration can be detailed in three options.
 
 Option One.
 ```
-[global.databases]
-rockpass = { url = "/location/of/rockpass.sqlite" }
+databases = { rockpass = { url = "/location/of/rockpass.sqlite" } }
 ```
 
 Option Two.
 ```
-[global.databases.rockpass]
+[release.databases]
+rockpass = { url = "/location/of/rockpass.sqlite" }
+```
+
+Option Three.
+```
+[release.databases.rockpass]
 url = "/location/of/rockpass.sqlite"
 ```
 
 If you don't want use a config file you can use environment variables. For
 example to disable registration and listen in 8080.
 ```
-export ROCKET_PORT=8080
-export ROCKET_REGISTRATION_ENABLED=false
-export ROCKET_DATABASES='{rockpass = { url = "/location/of/rockpass.sqlite" }}'
+export ROCKPASS_PORT=8080
+export ROCKPASS_REGISTRATION_ENABLED=false
+export ROCKPASS_DATABASES='{ rockpass = { url = "/location/of/rockpass.sqlite" } }'
 rockpass
 ```
 
-Finally if you want to execute the server without database (for testing) you
-can configure `url` as `:memory:`.
+You can run Rockpass without any configuration. By default it creates an
+in-memory DB that is deleted once the process stops, this is useful for
+testing purposes.
 ```
-ROCKET_DATABASES='{rockpass = { url = ":memory:" }}' rockpass
+rockpass
 ```
 
-[4]: https://rocket.rs/v0.4/guide/configuration/
+The latter is exactly the same as running Rockpass by setting the `url` key
+to `:memory:`.
+```
+ROCKPASS_DATABASES='{rockpass = { url = ":memory:" }}' rockpass
+```
+
+[rocket]: https://rocket.rs
+[rcdoc]: https://rocket.rs/v0.5-rc/guide/configuration/#configuration
+
+## Usage
+
+Rockpass is an API server for LessPass so it does not expose any interface.
+You can use any of the [existing LessPass applications][lpapps] (plugins,
+mobile...) to connect against the server or my own
+[lesspass-client][lesspass-client] command line client implementation.
+
+### Example of use with lesspass-client
+
+Let's see an example of use with `lesspass-client`. First we start
+`rockpass` without options or configuration to work directly in memory (it
+is an example). When we feel comfortable we can start Rockpass with its
+final configuration.
+```
+rockpass
+```
+
+The first thing we need to be able to connect is to create a user. For this
+user to be compatible with the official LessPass applications we must
+encrypt their password as LessPass does. We can do this with the
+lesspass-client itself as follows.
+```sh
+$ lesspass-client -m Login_Password password build lesspass.com login@mail.com
+|O}'bU/sW*7Dfw->
+```
+
+What we have done is encrypt a password `Login_Password` for the user
+`login@mail.com`, this has resulted in the encrypted password
+`|O}'bU/sW*7Dfw->` which is the one we must use to create the user.
+
+We now create the user as follows.
+```sh
+$ lesspass-client \
+  -s http://127.0.0.1:8000 \
+  user create "login@mail.com" "|O}'bU/sW*7Dfw->"
+New user created successfully
+```
+
+From here we can connect against the API either with the client applications
+or with the lesspass-client itself. If we do it with any of the client
+applications (for example the [Firefox plugin][ffplugin]), we will use as
+username `login@mail.com` and password `Login_Password` since the client
+application itself will be responsible for encrypting it. If, on the other
+hand, we do it with lesspass-client, the username will be the same but we
+must use the encrypted password as detailed below.
+```sh
+# Add a new password profile
+$ lesspass-client \
+  -s http://127.0.0.1:8000 \
+  -u "login@mail.com" \
+  -p "|O}'bU/sW*7Dfw->" \
+  password add example.com login@mail.com
+New password created successfully
+
+# List profiles stored on the server
+$ lesspass-client \
+  -s http://127.0.0.1:8000 \
+  -u "login@mail.com" \
+  -p "|O}'bU/sW*7Dfw->" \
+  password list
+example.com
+
+# Show a profile
+$ lesspass-client \
+  -s http://127.0.0.1:8000 \
+  -u "login@mail.com" \
+  -p "|O}'bU/sW*7Dfw->" \
+  password show example.com
+ID: 1
+Site: example.com
+Login: login@mail.com
+Lowercase: true
+Uppercase: true
+Symbols: true
+Numbers: true
+Length: 16
+Couter: 1
+
+# Encrypt a new password using a master password and the created profile
+# Option One (Master password as environment variable)
+$ export LESSPASS_MASTERPASS="very difficult master password"
+$ lesspass-client \
+  -s http://127.0.0.1:8000 \
+  -u "login@mail.com" \
+  -p "|O}'bU/sW*7Dfw->" \
+  password show -p example.com
+X?%x0O=yn&n4cWGU
+# Option Two (Master password as argument)
+$ lesspass-client \
+  -s http://127.0.0.1:8000 \
+  -u "login@mail.com" \
+  -p "|O}'bU/sW*7Dfw->" \
+  -m "very difficult master password as argument" \
+  password show -p example.com
+:~xd`ZtYvS1/8I2+
+# The passwords are different in each example because we have changed the
+# master password.
+```
+
+All of the above is just an example, lesspass-client is a complete client so
+it is possible to perform multiple operations on the LessPass API. See the
+command help for more information.
+
+[lpapps]: https://www.lesspass.com/#supported-platforms
+[lesspass-client]: https://github.com/ogarcia/lesspass-client
+[ffplugin]: https://addons.mozilla.org/en-US/firefox/addon/lesspass/
 
 ## Known limitations
 

@@ -4,7 +4,7 @@
 // Distributed under terms of the GNU GPLv3 license.
 //
 
-use serde::{Serialize, Deserialize};
+use rocket::serde::{Serialize, Deserialize};
 use chrono::NaiveDateTime;
 
 use crate::schema::passwords;
@@ -17,6 +17,7 @@ pub struct AuthorizedUser {
 }
 
 #[derive(Serialize, Deserialize, Queryable)]
+#[serde(crate = "rocket::serde")]
 pub struct User {
     pub id: i32,
     pub email: String,
@@ -24,23 +25,27 @@ pub struct User {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(crate = "rocket::serde")]
 pub struct NewUser {
     pub email: String,
     pub password: String
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(crate = "rocket::serde")]
 pub struct NewUserPassword {
     pub current_password: String,
     pub new_password: String
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(crate = "rocket::serde")]
 pub struct JWTRefreshToken {
     pub refresh: String
 }
 
 #[derive(Serialize, Deserialize, Queryable)]
+#[serde(crate = "rocket::serde")]
 pub struct DBToken {
     pub id: i32,
     pub user_id: i32,
@@ -51,6 +56,7 @@ pub struct DBToken {
 }
 
 #[derive(Serialize, Deserialize, Queryable)]
+#[serde(crate = "rocket::serde")]
 pub struct Password {
     pub id: i32,
     pub user_id: i32,
@@ -68,6 +74,7 @@ pub struct Password {
 }
 
 #[derive(Clone, Serialize, Deserialize, Insertable, AsChangeset)]
+#[serde(crate = "rocket::serde")]
 #[table_name="passwords"]
 pub struct NewPassword {
     pub login: String,

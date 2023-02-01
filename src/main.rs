@@ -11,9 +11,10 @@
 #[macro_use] extern crate rocket;
 #[macro_use] extern crate rocket_sync_db_pools;
 
-use serde::Deserialize;
 use rocket::fairing::AdHoc;
+use rocket::figment::{Figment, Profile, providers::{Env, Format, Serialized, Toml}};
 use rocket::{http::ContentType, Rocket, Build};
+use rocket::serde::{Deserialize, Serialize};
 
 mod fairings;
 mod models;
@@ -32,23 +33,39 @@ async fn database_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
     rocket
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
+#[serde(crate = "rocket::serde")]
 pub struct RockpassConfig {
-    #[serde(default = "default_registration_enabled")]
     registration_enabled: bool,
-    #[serde(default = "default_access_token_lifetime")]
     access_token_lifetime: i64,
-    #[serde(default = "default_refresh_token_lifetime")]
     refresh_token_lifetime: i64
 }
 
-fn default_registration_enabled() -> bool { true }
-fn default_access_token_lifetime() -> i64 { 3600 }
-fn default_refresh_token_lifetime() -> i64 { 2592000 }
+impl Default for RockpassConfig {
+    fn default() -> RockpassConfig {
+        RockpassConfig {
+            registration_enabled: true,
+            access_token_lifetime: 3600,
+            refresh_token_lifetime: 2592000
+        }
+    }
+}
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build()
+    let figment = Figment::from(rocket::Config::default())
+        .merge(Serialized::defaults(RockpassConfig::default()))
+        .merge(Toml::file("/etc/rockpass.toml").nested())
+        .merge(Toml::file("rockpass.toml").nested())
+        .merge(Env::prefixed("ROCKPASS_").global())
+        .select(Profile::from_env_or("ROCKPASS_PROFILE", "release"));
+    let database_url = match figment.extract_inner::<String>("databases.rockpass.url") {
+        Ok(database_url) => database_url,
+        Err(_) => ":memory:".to_string()
+    };
+    let figment = figment.merge(("databases.rockpass.url", database_url));
+
+    rocket::custom(figment)
         .attach(fairings::Cors)
         .attach(fairings::ForceContentType(ContentType::JSON))
         .attach(RockpassDatabase::fairing())
