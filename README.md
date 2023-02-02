@@ -1,9 +1,9 @@
 # Rockpass
 
-A small and ultrasecure [Lesspass][1] database server written in [Rust][2].
+A small and ultrasecure [LessPass][lesspass] database server written in
+[Rust][rust].
 
-[1]: https://lesspass.com/
-[2]: https://www.rust-lang.org/
+[rust]: https://www.rust-lang.org/
 
 ## Installation
 
@@ -263,7 +263,6 @@ it is possible to perform multiple operations on the LessPass API. See the
 command help for more information.
 
 [lpapps]: https://www.lesspass.com/#supported-platforms
-[lesspass-client]: https://github.com/ogarcia/lesspass-client
 [ffplugin]: https://addons.mozilla.org/en-US/firefox/addon/lesspass/
 
 ## Known limitations
@@ -271,23 +270,77 @@ command help for more information.
 ### Password reset
 
 With the premise in mind of keeping the code simple (remember that it is for
-personal use), Rockpass has not implemented any password reset API. But if
-any user does not remember their password you can reset it to a default
-value. For example, to reset the user _user@example.com_ password.
+personal use so KISS), Rockpass has not implemented any password reset API.
+However, if any user does not remember their password, you can reset it by
+following the procedure below.
+
+#### Encrypt your password
+
+LessPass encrypts the passwords in the client before sending them, so we
+must perform the same procedure since for each user the encrypted password
+is different. My advice is to use a temporary easy password (in my examples
+I will use `123456`) and then the user will change it to something more
+secure.
+
+To encrypt the password we can use [LessPass][lesspass] itself or my
+[lesspass-client][lesspass-client]. The parameters to use are the following.
+
+- Site: `lesspass.com`
+- Login: The email address you use to authenticate. I will use
+  `rockpass@example.com` in this example.
+- Master password: The new password you want to use. In my case as I said
+  before `123456`.
+- Options: Default. This means all options checked, size 16 and counter 1.
+
+If we want to encrypt the password with lesspass-client the command would
+be.
+```sh
+$ lesspass-client -m 123456 password build lesspass.com rockpass@example.com
+-!?}5Nx9E\%svt07
+```
+
+Regardless of how we encrypt the password the result is that our encrypted
+password is `-!?}5Nx9E\%svt07`. Obviously this is only valid if the user
+name is `rockpass@example.com`, if you use another user name it will
+generate a different encrypted password.
+
+#### Encrypt your password (again)
+
+Even if the password is encrypted by the client, Rockpass encrypts it again
+with Bcrypt hash, this is because in the client options you can select that
+the password is not encrypted and to increase security.
+
+To encrypt the password with [Bcrypt][bcrypt] the easiest way is to use
+a _web application_ that does it, for example [Bcrypt-Generator][bg] or
+[Bcrypt-Online][bo]. When encrypting with Bcrypt you have to set a cost
+factor, Rockpass uses a factor of 10, but it is OK to use a different
+factor.
+
+Note that each time you encrypt with Bcrypt a new string is generated, this
+is normal since Bcrypt generates a different _salt_ each time. In my case
+the password generated from `-!?}5Nx9E\%svt07` is
+`$2y$10$EYeEDnNN/dIQOkJtU9VQAe2fGXhncHbsdZnTdmrs6JMaceKqLg.X6`.
+
+[bcrypt]: https://en.wikipedia.org/wiki/Bcrypt
+[bg]: https://bcrypt-generator.com/
+[bo]: https://bcrypt.online/
+
+#### Update the password in the database
 
 1. _Connect_ to database.
-  ```sh
-  sqlite3 /location/of/rockpass.sqlite
-  ```
-2. Update password to a default `123456` value.
+   ```sh
+   sqlite3 /location/of/rockpass.sqlite
+   ```
+2. Update password to the value `123456` for the user `rockpass@example.com`.
    ```sql
    UPDATE users SET
-    password='$2b$10$jJXcsuftQI9PwF8eqZo4/ObfBGbc.nhLBpV49fC4qeLLeh/Uz0YzW'
-   WHERE email = 'user@example.com';
+    password='$2y$10$EYeEDnNN/dIQOkJtU9VQAe2fGXhncHbsdZnTdmrs6JMaceKqLg.X6'
+    WHERE email = 'rockpass@example.com';
    ```
 
-Now you can login with your username `user@example.com` and `123456` as
-password. Don't forget to change it after login!
+Now it would be possible to authenticate with the user
+`rockpass@example.com` with the password `123456` and modify it with the
+application. Don't forget to do it!
 
 ### Delete an user
 
@@ -304,3 +357,6 @@ _user@example.com_ and all of his/her passwords settings.
    PRAGMA foreign_keys = ON;
    DELETE FROM users WHERE email = 'user@example.com';
    ```
+
+[lesspass]: https://lesspass.com/
+[lesspass-client]: https://github.com/ogarcia/lesspass-client
