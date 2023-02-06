@@ -1,15 +1,11 @@
-ARG ALPINE_VERSION=3.17.1
-
-FROM alpine:${ALPINE_VERSION} AS builder
-COPY . /rockpass/src
-RUN /rockpass/src/.github/docker.sh
+ARG ALPINE_VERSION=latest
 
 FROM alpine:${ALPINE_VERSION}
-RUN apk -U --no-progress upgrade && \
-    apk --no-progress add libgcc sqlite-libs && \
+RUN adduser -S -D -H -h /var/lib/rockpass -s /sbin/nologin -G users -g rockpass rockpass && \
+    apk -U --no-progress add libgcc sqlite-libs && \
     install -d -m0755 -o100 -g100 /var/lib/rockpass && \
     rm -f /var/cache/apk/*
-COPY --from=builder /rockpass/pkg /
+COPY target/release/rockpass /bin/rockpass
 EXPOSE 8000
 ENV ROCKPASS_DATABASES="{rockpass={url=\"/var/lib/rockpass/rockpass.sqlite\"}}" \
     ROCKPASS_ADDRESS="0.0.0.0" \

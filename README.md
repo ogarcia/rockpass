@@ -12,14 +12,14 @@ A small and ultrasecure [LessPass][lesspass] database server written in
 Simply download latest release from [releases page][releases]. You can use
 [systemd unit][unit] from [Arch Linux package][package] to run it.
 
-[releases]: https://github.com/ogarcia/rockpass/releases
+[releases]: https://gitlab.com/ogarcia/rockpass/-/releases
 [unit]: https://aur.archlinux.org/cgit/aur.git/tree/rockpass.service?h=rockpass
 [package]: https://aur.archlinux.org/packages/rockpass
 
 ### With Docker
 
-A docker image of Rockpass can be downloaded from [here][ghcr] or from
-[Docker Hub][hub].
+You can download a Rockpass Docker image from [here][glcr], from [Docker
+Hub][hub] or from [Quay][quay].
 
 To run it, simply exec.
 ```
@@ -34,8 +34,9 @@ This start Rockpass and publish the port to host.
 Warning: this is a basic run, all data will be destroyed after container
 stop and rm.
 
-[ghcr]: https://github.com/users/ogarcia/packages/container/package/rockpass
+[glcr]: https://gitlab.com/ogarcia/rockpass/container_registry
 [hub]: https://hub.docker.com/r/ogarcia/rockpass
+[quay]: https://quay.io/repository/ogarcia/rockpass
 
 #### Persist data using a Docker volume
 
@@ -91,7 +92,7 @@ rustup override set stable
 
 To build Rockpass binary simply execute the following commands.
 ```sh
-git clone https://github.com/ogarcia/rockpass.git
+git clone https://gitlab.com/ogarcia/rockpass.git
 cd rockpass
 cargo build --release
 ```
@@ -359,4 +360,4 @@ _user@example.com_ and all of his/her passwords settings.
    ```
 
 [lesspass]: https://lesspass.com/
-[lesspass-client]: https://github.com/ogarcia/lesspass-client
+[lesspass-client]: https://gitlab.com/ogarcia/lesspass-client

@@ -4,15 +4,15 @@ version = "0.7.0"
 authors = ["Óscar García Amor"]
 license = "GPL-3.0"
 readme = "README.md"
-repository = "https://github.com/ogarcia/rockpass"
-documentation = "https://github.com/ogarcia/rockpass"
-homepage = "https://github.com/ogarcia/rockpass"
+repository = "https://gitlab.com/ogarcia/rockpass"
+documentation = "https://gitlab.com/ogarcia/rockpass"
+homepage = "https://gitlab.com/ogarcia/rockpass"
 description = """
-A small and ultrasecure Lesspass database server written in Rust.
+A small and ultrasecure LessPass database API server written in Rust.
 """
-keywords = ["lesspass", "database", "rocket", "server"]
+keywords = ["lesspass", "sqlite", "database", "api", "server"]
 edition = "2018"
-include = ["migrations/", "src/", "diesel.toml", "LICENSE", "README.md", "Rocket.toml.example"]
+include = ["migrations/", "src/", "diesel.toml", "LICENSE", "README.md", "rockpass.toml.example"]
 
 [dependencies]
 base64 = "0.13.0"
