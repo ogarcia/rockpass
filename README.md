@@ -11,6 +11,26 @@ A small and ultrasecure [LessPass][lesspass] database server written in
 
 Simply download latest release from [releases page][releases]. You can use
 [systemd unit][unit] from [Arch Linux package][package] to run it.
+```shell
+$ tar xf rockpass-release-X.X.X.tar.xz
+$ sudo install -m755 rockpass-X.X.X/rockpass /usr/bin/rockpass
+$ sudo install -m644 rockpass-X.X.X/rockpass/rockpass.toml.example \
+  /etc/rockpass.toml
+$ sudo vim /etc/rockpass.toml # Configure Rockpass as you like
+$ sudo wget https://aur.archlinux.org/cgit/aur.git/plain/rockpass.service?h=rockpass \
+  -O /etc/systemd/system/rockpass.service
+$ sudo systemctl start rockpass
+$ sudo systemctl enable rockpass
+```
+
+Note that the systemd unit uses a dynamic user that has a persistent
+directory in `/var/lib/rockpass/` so it is recommended that the SQLite DB be
+stored in this directory (see _production sample_ section in
+`rockpass.toml.example`).
+
+If everything worked correctly you should have a new clean database in
+`/var/lib/rockpass/rockpass.sqlite`. Go to the [usage section](#usage) to
+learn how to create your first user.
 
 [releases]: https://gitlab.com/ogarcia/rockpass/-/releases
 [unit]: https://aur.archlinux.org/cgit/aur.git/tree/rockpass.service?h=rockpass
@@ -91,7 +111,7 @@ rustup override set stable
 #### Installing Rockpass
 
 To build Rockpass binary simply execute the following commands.
-```sh
+```shell
 git clone https://gitlab.com/ogarcia/rockpass.git
 cd rockpass
 cargo build --release
@@ -119,25 +139,25 @@ parameters are detailed below.
 The database configuration can be detailed in three options.
 
 Option One.
-```
+```toml
 databases = { rockpass = { url = "/location/of/rockpass.sqlite" } }
 ```
 
 Option Two.
-```
+```toml
 [release.databases]
 rockpass = { url = "/location/of/rockpass.sqlite" }
 ```
 
 Option Three.
-```
+```toml
 [release.databases.rockpass]
 url = "/location/of/rockpass.sqlite"
 ```
 
 If you don't want use a config file you can use environment variables. For
 example to disable registration and listen in 8080.
-```
+```shell
 export ROCKPASS_PORT=8080
 export ROCKPASS_REGISTRATION_ENABLED=false
 export ROCKPASS_DATABASES='{ rockpass = { url = "/location/of/rockpass.sqlite" } }'
@@ -160,6 +180,86 @@ ROCKPASS_DATABASES='{rockpass = { url = ":memory:" }}' rockpass
 [rocket]: https://rocket.rs
 [rcdoc]: https://rocket.rs/v0.5-rc/guide/configuration/#configuration
 
+## Secure it
+
+You can use Rockpass directly on a local network, but if you want to expose
+it to the Internet it is best to set up some kind of http server in front of
+it (remember to configure it to listen only to localhost).
+
+### With nginx
+
+```nginx
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+
+  server_name rockpass.example.com;
+
+  access_log /var/log/nginx/rockpass.access.log;
+  error_log  /var/log/nginx/rockpass.error.log;
+
+  ssl_certificate           /etc/letsencrypt/live/rockpass.example.com/fullchain.pem;
+  ssl_certificate_key       /etc/letsencrypt/live/rockpass.example.com/privkey.pem;
+  ssl_trusted_certificate   /etc/letsencrypt/live/rockpass.example.com/chain.pem;
+  ssl_session_timeout       1d;
+  ssl_session_cache         shared:MozSSL:10m;
+  ssl_session_tickets       off;
+  ssl_protocols             TLSv1.3;
+  ssl_prefer_server_ciphers off;
+  ssl_stapling              on;
+  ssl_stapling_verify       on;
+
+  root /srv/http/pass/htdocs;
+
+  # Only exposes Rockpass on the endpoints it can handle
+  location ~ (/auth/|/passwords/) {
+    proxy_set_header Host              $http_host;
+    proxy_max_temp_file_size           0;
+    proxy_read_timeout                 1800s;
+    proxy_send_timeout                 1800s;
+    proxy_pass                         http://127.0.0.1:8000;
+    proxy_redirect                     http:// https://;
+  }
+}
+```
+
+You must create an empty `index.html` file in `/srv/http/pass/htdocs` so
+that when someone accesses `rockpass.example.com` they simply get a blank
+page.
+
+If you want to increase security you can introduce some kind of random
+string in the exposed endpoints as detailed in the following example.
+```nginx
+# Expose Rockpass under very difficult URL
+location ~ (/somerandomstring/auth/|/somerandomstring/passwords/) {
+  rewrite  ^/somerandomstring/(.*) /$1 break;
+  proxy_set_header Host              $http_host;
+  proxy_max_temp_file_size           0;
+  proxy_read_timeout                 1800s;
+  proxy_send_timeout                 1800s;
+  proxy_pass                         http://127.0.0.1:8000;
+  proxy_redirect                     http:// https://;
+}
+```
+
+Now in the clients you must configure the server address as
+`https://rockpass.example.com/somerandomstring/`. This way it will be very
+difficult for an external attacker to locate where you have Rockpass
+listening.
+
+### With lighttpd
+
+```lighttpd
+$HTTP["url"] =~ "^/rockpass" {
+  proxy.server = ( "" => ( ( "host" => "127.0.0.1", "port" => "8000" )))
+  proxy.header = ( "map-urlpath" => ( "/rockpass" => ""))
+}
+```
+
+In this case Rockpass will be listening at
+`https://rockpass.example.com/rockpass/`. If you change `rockpass` to some
+kind of random string you will increase the security.
+
 ## Usage
 
 Rockpass is an API server for LessPass so it does not expose any interface.
@@ -181,7 +281,7 @@ The first thing we need to be able to connect is to create a user. For this
 user to be compatible with the official LessPass applications we must
 encrypt their password as LessPass does. We can do this with the
 lesspass-client itself as follows.
-```sh
+```shell
 $ lesspass-client -m Login_Password password build lesspass.com login@mail.com
 |O}'bU/sW*7Dfw->
 ```
@@ -191,7 +291,7 @@ What we have done is encrypt a password `Login_Password` for the user
 `|O}'bU/sW*7Dfw->` which is the one we must use to create the user.
 
 We now create the user as follows.
-```sh
+```shell
 $ lesspass-client \
   -s http://127.0.0.1:8000 \
   user create "login@mail.com" "|O}'bU/sW*7Dfw->"
@@ -205,7 +305,7 @@ username `login@mail.com` and password `Login_Password` since the client
 application itself will be responsible for encrypting it. If, on the other
 hand, we do it with lesspass-client, the username will be the same but we
 must use the encrypted password as detailed below.
-```sh
+```shell
 # Add a new password profile
 $ lesspass-client \
   -s http://127.0.0.1:8000 \
@@ -262,6 +362,43 @@ $ lesspass-client \
 All of the above is just an example, lesspass-client is a complete client so
 it is possible to perform multiple operations on the LessPass API. See the
 command help for more information.
+
+### Migrate data with lesspass-client
+
+If you want to migrate an account from any LessPass server to Rockpass you
+can use `lesspass-client`. You will need to encrypt the passwords to be able
+to export and import the data, see the example above to know how to do it.
+
+First we export the profiles to `profiles.json`.
+```shell
+$ lesspass-client -s https://api.lesspass.example.com \
+  -u LOGIN_EMAIL \
+  -p ENCRYPTED_LOGIN_PASSWORD \
+  password export profiles.json
+```
+
+Then we import them.
+```shell
+$ lesspass-client -s http://127.0.0.1:8000 \
+  -u LOGIN_EMAIL \
+  -p ENCRYPTED_LOGIN_PASSWORD \
+  password import profiles.json
+```
+
+You can do this operation in memory without using a file as follows.
+```
+$ lesspass-client -s https://api.lesspass.example.com \
+  -u LOGIN_EMAIL \
+  -p ENCRYPTED_LOGIN_PASSWORD \
+  password export - | \
+  lesspass-client -s http://127.0.0.1:8000 \
+  -u LOGIN_EMAIL \
+  -p ENCRYPTED_LOGIN_PASSWORD \
+  password import -
+```
+
+Note that when importing data it is not overwritten so if you import the
+same JSON twice you will have repeated entries.
 
 [lpapps]: https://www.lesspass.com/#supported-platforms
 [ffplugin]: https://addons.mozilla.org/en-US/firefox/addon/lesspass/
