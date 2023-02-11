@@ -4,7 +4,7 @@ default:
 variables:
   QUAY_REGISTRY_URL: "quay.io"
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/rockpass/${CI_COMMIT_TAG}"
-  PACKAGE: rockpass-release-${CI_COMMIT_TAG}.tar.xz
+  PACKAGE: rockpass-release-${CI_COMMIT_TAG}-linux-amd64.tar.xz
 
 stages:
   - Build
@@ -20,7 +20,7 @@ Build Rockpass:
     - apk -U --no-progress add libc-dev sqlite-dev
     - cargo build --release --locked
   artifacts:
-    name: rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
+    name: rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64
     paths:
       - target/release/rockpass
   cache:
@@ -30,31 +30,37 @@ Build Rockpass:
 
 Package Rockpass:
   stage: Package
+  variables:
+    PACKAGE_NAME: rockpass-package-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64
+    PACKAGE_PATH: rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64
   script:
     - apk -U --no-progress add xz
-    - install -Dm755 "target/release/rockpass" "rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}/rockpass"
-    - install -Dm644 "rockpass.toml.example" "rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}/rockpass.toml.example"
-    - install -Dm644 "README.md" "rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}/README.md"
-    - install -Dm644 "LICENSE" "rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}/LICENSE"
-    - tar cvJf "rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}.tar.xz" "rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}"
+    - install -Dm755 "target/release/rockpass" "${PACKAGE_PATH}/rockpass"
+    - install -Dm644 "rockpass.toml.example" "${PACKAGE_PATH}/rockpass.toml.example"
+    - install -Dm644 "README.md" "${PACKAGE_PATH}/README.md"
+    - install -Dm644 "LICENSE" "${PACKAGE_PATH}/LICENSE"
+    - tar cvJf "${PACKAGE_NAME}.tar.xz" "${PACKAGE_PATH}"
   artifacts:
-    name: rockpass-package-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}
+    name: ${PACKAGE_NAME}
     paths:
-      - rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}.tar.xz
+      - ${PACKAGE_NAME}.tar.xz
   rules:
     - if: $CI_COMMIT_TAG == null
 
 Package Rockpass release:
   stage: Package
+  variables:
+    PACKAGE_NAME: rockpass-release-package-${CI_COMMIT_TAG}-linux-amd64
+    PACKAGE_PATH: rockpass-${CI_COMMIT_TAG}-linux-amd64
   script:
     - apk -U --no-progress add xz
-    - install -Dm755 "target/release/rockpass" "rockpass-${CI_COMMIT_TAG}/rockpass"
-    - install -Dm644 "rockpass.toml.example" "rockpass-${CI_COMMIT_TAG}/rockpass.toml.example"
-    - install -Dm644 "README.md" "rockpass-${CI_COMMIT_TAG}/README.md"
-    - install -Dm644 "LICENSE" "rockpass-${CI_COMMIT_TAG}/LICENSE"
-    - tar cvJf ${PACKAGE} "rockpass-${CI_COMMIT_TAG}"
+    - install -Dm755 "target/release/rockpass" "${PACKAGE_PATH}/rockpass"
+    - install -Dm644 "rockpass.toml.example" "${PACKAGE_PATH}/rockpass.toml.example"
+    - install -Dm644 "README.md" "${PACKAGE_PATH}/README.md"
+    - install -Dm644 "LICENSE" "${PACKAGE_PATH}/LICENSE"
+    - tar cvJf ${PACKAGE} "${PACKAGE_PATH}"
   artifacts:
-    name: rockpass-release-package-${CI_COMMIT_TAG}
+    name: ${PACKAGE_NAME}
     paths:
       - ${PACKAGE}
   rules:

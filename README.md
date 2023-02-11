@@ -12,9 +12,9 @@ A small and ultrasecure [LessPass][lesspass] database server written in
 Simply download latest release from [releases page][releases]. You can use
 [systemd unit][unit] from [Arch Linux package][package] to run it.
 ```shell
-$ tar xf rockpass-release-X.X.X.tar.xz
-$ sudo install -m755 rockpass-X.X.X/rockpass /usr/bin/rockpass
-$ sudo install -m644 rockpass-X.X.X/rockpass/rockpass.toml.example \
+$ tar xf rockpass-release-X.X.X-ARCH.tar.xz
+$ sudo install -m755 rockpass-X.X.X-ARCH/rockpass /usr/bin/rockpass
+$ sudo install -m644 rockpass-X.X.X-ARCH/rockpass/rockpass.toml.example \
   /etc/rockpass.toml
 $ sudo vim /etc/rockpass.toml # Configure Rockpass as you like
 $ sudo wget https://aur.archlinux.org/cgit/aur.git/plain/rockpass.service?h=rockpass \
@@ -22,6 +22,10 @@ $ sudo wget https://aur.archlinux.org/cgit/aur.git/plain/rockpass.service?h=rock
 $ sudo systemctl start rockpass
 $ sudo systemctl enable rockpass
 ```
+
+Warning: The only binary provided is for `linux-amd64`, if you need to run
+Rockpass on another architecture (like a Raspberry Pi) you must compile it,
+see how to do it in the [from source section](#from-source).
 
 Note that the systemd unit uses a dynamic user that has a persistent
 directory in `/var/lib/rockpass/` so it is recommended that the SQLite DB be
