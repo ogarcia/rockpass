@@ -12,15 +12,15 @@ A small and ultrasecure [LessPass][lesspass] database server written in
 Simply download latest release from [releases page][releases]. You can use
 [systemd unit][unit] from [Arch Linux package][package] to run it.
 ```shell
-$ tar xf rockpass-X.X.X-ARCH.tar.xz
-$ sudo install -m755 rockpass-X.X.X-ARCH/rockpass /usr/bin/rockpass
-$ sudo install -m644 rockpass-X.X.X-ARCH/rockpass/rockpass.toml.example \
+tar xf rockpass-X.X.X-ARCH.tar.xz
+sudo install -m755 rockpass-X.X.X-ARCH/rockpass /usr/bin/rockpass
+sudo install -m644 rockpass-X.X.X-ARCH/rockpass/rockpass.toml.example \
   /etc/rockpass.toml
-$ sudo vim /etc/rockpass.toml # Configure Rockpass as you like
-$ sudo wget https://aur.archlinux.org/cgit/aur.git/plain/rockpass.service?h=rockpass \
-  -O /etc/systemd/system/rockpass.service
-$ sudo systemctl start rockpass
-$ sudo systemctl enable rockpass
+sudo vim /etc/rockpass.toml # Configure Rockpass as you like
+sudo curl 'https://aur.archlinux.org/cgit/aur.git/plain/rockpass.service?h=rockpass' \
+  -o /etc/systemd/system/rockpass.service
+sudo systemctl start rockpass
+sudo systemctl enable rockpass
 ```
 
 Warning: The only binary provided is for `linux-amd64`, if you need to run
