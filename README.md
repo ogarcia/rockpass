@@ -12,7 +12,7 @@ A small and ultrasecure [LessPass][lesspass] database server written in
 Simply download latest release from [releases page][releases]. You can use
 [systemd unit][unit] from [Arch Linux package][package] to run it.
 ```shell
-$ tar xf rockpass-release-X.X.X-ARCH.tar.xz
+$ tar xf rockpass-X.X.X-ARCH.tar.xz
 $ sudo install -m755 rockpass-X.X.X-ARCH/rockpass /usr/bin/rockpass
 $ sudo install -m644 rockpass-X.X.X-ARCH/rockpass/rockpass.toml.example \
   /etc/rockpass.toml
