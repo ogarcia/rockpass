@@ -34,7 +34,8 @@ pub struct Authorization(RockpassDatabase, AuthorizedUser);
 #[derive(Debug)]
 pub enum AuthorizationError {
     Missing,
-    Invalid
+    Invalid,
+    Unauthorized
 }
 
 #[rocket::async_trait]
@@ -53,7 +54,7 @@ impl<'r> FromRequest<'r> for Authorization {
                     // Check the autorization token (remove 'bearer' and pass JWT token only)
                     match check_authorization(&connection, &auth[7..]).await {
                         Ok(authorized_user) => Outcome::Success(Authorization(connection, authorized_user)),
-                        Err(_) => Outcome::Failure((Status::BadRequest, AuthorizationError::Invalid))
+                        Err(_) => Outcome::Failure((Status::Unauthorized, AuthorizationError::Unauthorized))
                     }
                 } else {
                     Outcome::Failure((Status::BadRequest, AuthorizationError::Invalid))
@@ -329,7 +330,7 @@ pub async fn post_auth_jwt_refresh(connection: RockpassDatabase, config: &State<
                 Err(()) => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem generating the new token"})))
             }
         },
-        Err(_) => status::Custom(Status::InternalServerError, Json(json!({"detail": "Your refresh token is not valid"})))
+        Err(_) => status::Custom(Status::Unauthorized, Json(json!({"detail": "Your refresh token is not valid"})))
     }
 }
 

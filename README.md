@@ -23,9 +23,10 @@ sudo systemctl start rockpass
 sudo systemctl enable rockpass
 ```
 
-Warning: The only binary provided is for `linux-amd64`, if you need to run
-Rockpass on another architecture (like a Raspberry Pi) you must compile it,
-see how to do it in the [from source section](#from-source).
+Warning: The only binaries provided are for `linux-amd64` and `linux-arm64`,
+if you need to run Rockpass on another architecture (like a Raspberry Pi
+32bit) you must compile it, see how to do it in the [from source
+section](#from-source).
 
 Note that the systemd unit uses a dynamic user that has a persistent
 directory in `/var/lib/rockpass/` so it is recommended that the SQLite DB be
@@ -43,7 +44,7 @@ learn how to create your first user.
 ### With Docker
 
 You can download a Rockpass Docker image from [here][glcr], from [Docker
-Hub][hub] or from [Quay][quay].
+Hub][hub] or from [Quay][quay] (only `linux-amd64-musl`).
 
 To run it, simply exec.
 ```
@@ -112,7 +113,7 @@ rustup override set stable
 
 [rustup]: https://rustup.rs/
 
-#### Installing Rockpass
+#### Building Rockpass
 
 To build Rockpass binary simply execute the following commands.
 ```shell

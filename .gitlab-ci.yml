@@ -15,13 +15,25 @@ variables:
   PACKAGE_PATH_ARM64: rockpass-${CI_COMMIT_TAG}-linux-arm64
 
 stages:
+  - Test
   - Build
+  - Archive
   - Package
   - Docker
   - Publish
   - Release
 
-Build Rockpass AMD64 glibc:
+Test AMD64 glibc:
+  stage: Test
+  image: rust:buster
+  script:
+    - cargo test
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-amd64-glibc
+    paths:
+      - target
+
+Build AMD64 glibc:
   stage: Build
   image: rust:buster
   script:
@@ -35,7 +47,7 @@ Build Rockpass AMD64 glibc:
     paths:
       - target
 
-Build Rockpass AMD64 musl:
+Build AMD64 musl:
   stage: Build
   image: rust:alpine
   script:
@@ -50,7 +62,7 @@ Build Rockpass AMD64 musl:
     paths:
       - target
 
-Build Rockpass ARM64:
+Build ARM64:
   stage: Build
   image: rust:alpine
   script:
@@ -67,8 +79,8 @@ Build Rockpass ARM64:
   tags:
     - arm64
 
-Package Rockpass AMD64 glibc:
-  stage: Package
+Archive AMD64 glibc:
+  stage: Archive
   script:
     - install -Dm755 "target/release/rockpass" "${ARTIFACTS_AMD64_GLIBC}/rockpass"
     - install -Dm644 "rockpass.toml.example" "${ARTIFACTS_AMD64_GLIBC}/rockpass.toml.example"
@@ -79,12 +91,12 @@ Package Rockpass AMD64 glibc:
     paths:
       - ${ARTIFACTS_AMD64_GLIBC}/
   needs:
-    - Build Rockpass AMD64 glibc
+    - Build AMD64 glibc
   rules:
     - if: $CI_COMMIT_TAG == null && $CI_PIPELINE_SOURCE != "merge_request_event"
 
-Package Rockpass AMD64 musl:
-  stage: Package
+Archive AMD64 musl:
+  stage: Archive
   script:
     - install -Dm755 "target/release/rockpass" "${ARTIFACTS_AMD64_MUSL}/rockpass"
     - install -Dm644 "rockpass.toml.example" "${ARTIFACTS_AMD64_MUSL}/rockpass.toml.example"
@@ -95,12 +107,12 @@ Package Rockpass AMD64 musl:
     paths:
       - ${ARTIFACTS_AMD64_MUSL}/
   needs:
-    - Build Rockpass AMD64 musl
+    - Build AMD64 musl
   rules:
     - if: $CI_COMMIT_TAG == null && $CI_PIPELINE_SOURCE != "merge_request_event"
 
-Package Rockpass ARM64:
-  stage: Package
+Archive ARM64:
+  stage: Archive
   script:
     - install -Dm755 "target/release/rockpass" "${ARTIFACTS_ARM64}/rockpass"
     - install -Dm644 "rockpass.toml.example" "${ARTIFACTS_ARM64}/rockpass.toml.example"
@@ -111,11 +123,11 @@ Package Rockpass ARM64:
     paths:
       - ${ARTIFACTS_ARM64}/
   needs:
-    - Build Rockpass ARM64
+    - Build ARM64
   rules:
     - if: $CI_COMMIT_TAG == null && $CI_PIPELINE_SOURCE != "merge_request_event"
 
-Package Rockpass release AMD64 glibc:
+Package AMD64 glibc:
   stage: Package
   script:
     - apk -U --no-progress add xz
@@ -129,11 +141,11 @@ Package Rockpass release AMD64 glibc:
     paths:
       - ${PACKAGE_NAME_AMD64_GLIBC}
   needs:
-    - Build Rockpass AMD64 glibc
+    - Build AMD64 glibc
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
 
-Package Rockpass release AMD64 musl:
+Package AMD64 musl:
   stage: Package
   script:
     - apk -U --no-progress add xz
@@ -147,11 +159,11 @@ Package Rockpass release AMD64 musl:
     paths:
       - ${PACKAGE_NAME_AMD64_MUSL}
   needs:
-    - Build Rockpass AMD64 musl
+    - Build AMD64 musl
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
 
-Package Rockpass release ARM64:
+Package ARM64:
   stage: Package
   script:
     - apk -U --no-progress add xz
@@ -165,7 +177,7 @@ Package Rockpass release ARM64:
     paths:
       - ${PACKAGE_NAME_ARM64}
   needs:
-    - Build Rockpass ARM64
+    - Build ARM64
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
 
@@ -187,7 +199,7 @@ Build and publish branch Docker image:
   rules:
     - if: $CI_COMMIT_TAG == null && $CI_PROJECT_ID == "43241571" && $CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_REF_PROTECTED == "true"
   needs:
-    - Build Rockpass AMD64 musl
+    - Build AMD64 musl
 
 Build and publish release Docker image:
   stage: Docker
@@ -232,9 +244,9 @@ Build and publish release Docker image:
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
   needs:
-    - Build Rockpass AMD64 musl
+    - Build AMD64 musl
 
-Publish Rockpass release:
+Publish release:
   stage: Publish
   image: curlimages/curl:latest
   script:
