@@ -31,6 +31,12 @@ pub struct NewUser {
     pub password: String
 }
 
+#[derive(Deserialize)]
+#[serde(crate = "rocket::serde")]
+pub struct UserPassword {
+    pub current_password: String
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct NewUserPassword {

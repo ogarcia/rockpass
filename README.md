@@ -487,9 +487,11 @@ application. Don't forget to do it!
 
 ### Delete an user
 
-For now, user deletion cannot be done via API. If you want to delete an user
-you can do it with `sqlite` command. For example to delete user
-_user@example.com_ and all of his/her passwords settings.
+Users can delete their own accounts using any of the mobile or
+[lesspass-client][lesspass-client] applications (browser extensions do not
+have this option). You can still delete any user with the `sqlite` command.
+For example to delete user _user@example.com_ and all of his/her passwords
+settings.
 
 1. _Connect_ to database.
    ```sh

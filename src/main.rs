@@ -76,6 +76,7 @@ fn rocket() -> _ {
                routes::post_auth_users,
                routes::options_auth_users_me,
                routes::get_auth_users_me,
+               routes::delete_auth_users_me,
                routes::options_auth_users_set_password,
                routes::post_auth_users_set_password,
                routes::options_auth_jwt_create,
@@ -193,6 +194,42 @@ mod tests {
         let response = request.dispatch().await;
         assert_eq!(response.status(), Status::Ok);
         assert_eq!(response.into_string().await.unwrap(), r#"{"email":"test@rockpass.sample","id":1}"#);
+    }
+
+    #[rocket::async_test]
+    async fn test_delete_auth_users_me() {
+        let client = Client::tracked(rocket()).await.unwrap();
+        // Create a user and token
+        let token = create_token(&client).await;
+        // Attempt to delete user fails because no access token specified
+        let request = client.delete("/auth/users/me")
+            .header(ContentType::JSON);
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::BadRequest);
+        // The attempt to delete user fails because, although a valid formatted token is specified,
+        // the token is not correct.
+        let request = client.delete("/auth/users/me")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", "bearer false"));
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Unauthorized);
+        // The attempt to delete user fails because, although it has been validated correctly, the
+        // password does not match.
+        let request = client.delete("/auth/users/me")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", format!("bearer {}", token.access)))
+            .body(r#"{"current_password":"bad"}"#);
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Forbidden);
+        assert_eq!(response.into_string().await.unwrap(), r#"{"detail":"Password does not match with the one stored in database"}"#);
+        // Get user data
+        let request = client.delete("/auth/users/me")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", format!("bearer {}", token.access)))
+            .body(r#"{"current_password":"test"}"#);
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Ok);
+        assert_eq!(response.into_string().await.unwrap(), r#"{"detail":"Your user has been deleted"}"#);
     }
 
     #[rocket::async_test]

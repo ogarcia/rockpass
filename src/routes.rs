@@ -19,7 +19,7 @@ use sha2::Sha256;
 use std::collections::BTreeMap;
 use uuid::Uuid;
 
-use crate::models::{AuthorizedUser, NewUser, NewUserPassword, User, JWTRefreshToken, DBToken, NewPassword, Password};
+use crate::models::{AuthorizedUser, NewUser, NewUserPassword, User, UserPassword, JWTRefreshToken, DBToken, NewPassword, Password};
 use crate::{RockpassDatabase, RockpassConfig};
 use crate::schema::passwords::dsl::*;
 use crate::schema::tokens::dsl::*;
@@ -249,6 +249,25 @@ pub async fn get_auth_users_me(authorization: Authorization) -> status::Custom<J
                 "email": authorization.1.email
             })
         ))
+}
+
+#[delete("/auth/users/me", data = "<user_password>")]
+pub async fn delete_auth_users_me(authorization: Authorization, user_password: Json<UserPassword>) -> status::Custom<Json<Value>> {
+    if verify(&user_password.0.current_password, &authorization.1.password).unwrap() {
+        let connection = authorization.0;
+        let authorized_user_id = authorization.1.id;
+        // Delete current user
+        match connection.run(move |c| {
+            diesel::delete(users)
+                .filter(users::id.eq(&authorized_user_id))
+                .execute(c)
+            }).await {
+                Ok(_) => status::Custom(Status::Ok, Json(json!({"detail": "Your user has been deleted"}))),
+                Err(_) => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem deleting your user"})))
+        }
+    } else {
+        status::Custom(Status::Forbidden, Json(json!({"detail": "Password does not match with the one stored in database"})))
+    }
 }
 
 #[options("/auth/users/set_password")]
