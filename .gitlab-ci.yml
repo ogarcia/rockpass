@@ -4,9 +4,15 @@ default:
 variables:
   QUAY_REGISTRY_URL: "quay.io"
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/rockpass/${CI_COMMIT_TAG}"
-  ARTIFACTS: rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64
-  PACKAGE_NAME: rockpass-${CI_COMMIT_TAG}-linux-amd64.tar.xz
-  PACKAGE_PATH: rockpass-${CI_COMMIT_TAG}-linux-amd64
+  ARTIFACTS_AMD64_GLIBC: rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64-glibc
+  ARTIFACTS_AMD64_MUSL: rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64-musl
+  ARTIFACTS_ARM64: rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-arm64
+  PACKAGE_NAME_AMD64_GLIBC: rockpass-${CI_COMMIT_TAG}-linux-amd64-glibc.tar.xz
+  PACKAGE_PATH_AMD64_GLIBC: rockpass-${CI_COMMIT_TAG}-linux-amd64-glibc
+  PACKAGE_NAME_AMD64_MUSL: rockpass-${CI_COMMIT_TAG}-linux-amd64-musl.tar.xz
+  PACKAGE_PATH_AMD64_MUSL: rockpass-${CI_COMMIT_TAG}-linux-amd64-musl
+  PACKAGE_NAME_ARM64: rockpass-${CI_COMMIT_TAG}-linux-arm64.tar.xz
+  PACKAGE_PATH_ARM64: rockpass-${CI_COMMIT_TAG}-linux-arm64
 
 stages:
   - Build
@@ -15,48 +21,151 @@ stages:
   - Publish
   - Release
 
-Build Rockpass:
+Build Rockpass AMD64 glibc:
+  stage: Build
+  image: rust:buster
+  script:
+    - cargo build --release --locked
+  artifacts:
+    name: ${ARTIFACTS_AMD64_GLIBC}
+    paths:
+      - target/release/rockpass
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-amd64-glibc
+    paths:
+      - target
+
+Build Rockpass AMD64 musl:
   stage: Build
   image: rust:alpine
   script:
     - apk -U --no-progress add libc-dev sqlite-dev
     - cargo build --release --locked
   artifacts:
-    name: ${ARTIFACTS}
+    name: ${ARTIFACTS_AMD64_MUSL}
     paths:
       - target/release/rockpass
   cache:
-    key: ${CI_COMMIT_REF_SLUG}
+    key: ${CI_COMMIT_REF_SLUG}-amd64-musl
     paths:
       - target
 
-Package Rockpass:
+Build Rockpass ARM64:
+  stage: Build
+  image: rust:alpine
+  script:
+    - apk -U --no-progress add libc-dev sqlite-dev
+    - cargo build --release --locked
+  artifacts:
+    name: ${ARTIFACTS_ARM64}
+    paths:
+      - target/release/rockpass
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-arm64
+    paths:
+      - target
+  tags:
+    - arm64
+
+Package Rockpass AMD64 glibc:
   stage: Package
   script:
-    - install -Dm755 "target/release/rockpass" "${ARTIFACTS}/rockpass"
-    - install -Dm644 "rockpass.toml.example" "${ARTIFACTS}/rockpass.toml.example"
-    - install -Dm644 "README.md" "${ARTIFACTS}/README.md"
-    - install -Dm644 "LICENSE" "${ARTIFACTS}/LICENSE"
+    - install -Dm755 "target/release/rockpass" "${ARTIFACTS_AMD64_GLIBC}/rockpass"
+    - install -Dm644 "rockpass.toml.example" "${ARTIFACTS_AMD64_GLIBC}/rockpass.toml.example"
+    - install -Dm644 "README.md" "${ARTIFACTS_AMD64_GLIBC}/README.md"
+    - install -Dm644 "LICENSE" "${ARTIFACTS_AMD64_GLIBC}/LICENSE"
   artifacts:
-    name: ${ARTIFACTS}
+    name: ${ARTIFACTS_AMD64_GLIBC}
     paths:
-      - ${ARTIFACTS}/
+      - ${ARTIFACTS_AMD64_GLIBC}/
+  needs:
+    - Build Rockpass AMD64 glibc
   rules:
     - if: $CI_COMMIT_TAG == null && $CI_PIPELINE_SOURCE != "merge_request_event"
 
-Package Rockpass release:
+Package Rockpass AMD64 musl:
+  stage: Package
+  script:
+    - install -Dm755 "target/release/rockpass" "${ARTIFACTS_AMD64_MUSL}/rockpass"
+    - install -Dm644 "rockpass.toml.example" "${ARTIFACTS_AMD64_MUSL}/rockpass.toml.example"
+    - install -Dm644 "README.md" "${ARTIFACTS_AMD64_MUSL}/README.md"
+    - install -Dm644 "LICENSE" "${ARTIFACTS_AMD64_MUSL}/LICENSE"
+  artifacts:
+    name: ${ARTIFACTS_AMD64_MUSL}
+    paths:
+      - ${ARTIFACTS_AMD64_MUSL}/
+  needs:
+    - Build Rockpass AMD64 musl
+  rules:
+    - if: $CI_COMMIT_TAG == null && $CI_PIPELINE_SOURCE != "merge_request_event"
+
+Package Rockpass ARM64:
+  stage: Package
+  script:
+    - install -Dm755 "target/release/rockpass" "${ARTIFACTS_ARM64}/rockpass"
+    - install -Dm644 "rockpass.toml.example" "${ARTIFACTS_ARM64}/rockpass.toml.example"
+    - install -Dm644 "README.md" "${ARTIFACTS_ARM64}/README.md"
+    - install -Dm644 "LICENSE" "${ARTIFACTS_ARM64}/LICENSE"
+  artifacts:
+    name: ${ARTIFACTS_ARM64}
+    paths:
+      - ${ARTIFACTS_ARM64}/
+  needs:
+    - Build Rockpass ARM64
+  rules:
+    - if: $CI_COMMIT_TAG == null && $CI_PIPELINE_SOURCE != "merge_request_event"
+
+Package Rockpass release AMD64 glibc:
   stage: Package
   script:
     - apk -U --no-progress add xz
-    - install -Dm755 "target/release/rockpass" "${PACKAGE_PATH}/rockpass"
-    - install -Dm644 "rockpass.toml.example" "${PACKAGE_PATH}/rockpass.toml.example"
-    - install -Dm644 "README.md" "${PACKAGE_PATH}/README.md"
-    - install -Dm644 "LICENSE" "${PACKAGE_PATH}/LICENSE"
-    - tar cvJf "${PACKAGE_NAME}" "${PACKAGE_PATH}"
+    - install -Dm755 "target/release/rockpass" "${PACKAGE_PATH_AMD64_GLIBC}/rockpass"
+    - install -Dm644 "rockpass.toml.example" "${PACKAGE_PATH_AMD64_GLIBC}/rockpass.toml.example"
+    - install -Dm644 "README.md" "${PACKAGE_PATH_AMD64_GLIBC}/README.md"
+    - install -Dm644 "LICENSE" "${PACKAGE_PATH_AMD64_GLIBC}/LICENSE"
+    - tar cvJf "${PACKAGE_NAME_AMD64_GLIBC}" "${PACKAGE_PATH_AMD64_GLIBC}"
   artifacts:
-    name: ${ARTIFACTS}
+    name: ${ARTIFACTS_AMD64_GLIBC}
     paths:
-      - ${PACKAGE_NAME}
+      - ${PACKAGE_NAME_AMD64_GLIBC}
+  needs:
+    - Build Rockpass AMD64 glibc
+  rules:
+    - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
+
+Package Rockpass release AMD64 musl:
+  stage: Package
+  script:
+    - apk -U --no-progress add xz
+    - install -Dm755 "target/release/rockpass" "${PACKAGE_PATH_AMD64_MUSL}/rockpass"
+    - install -Dm644 "rockpass.toml.example" "${PACKAGE_PATH_AMD64_MUSL}/rockpass.toml.example"
+    - install -Dm644 "README.md" "${PACKAGE_PATH_AMD64_MUSL}/README.md"
+    - install -Dm644 "LICENSE" "${PACKAGE_PATH_AMD64_MUSL}/LICENSE"
+    - tar cvJf "${PACKAGE_NAME_AMD64_MUSL}" "${PACKAGE_PATH_AMD64_MUSL}"
+  artifacts:
+    name: ${ARTIFACTS_AMD64_MUSL}
+    paths:
+      - ${PACKAGE_NAME_AMD64_MUSL}
+  needs:
+    - Build Rockpass AMD64 musl
+  rules:
+    - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
+
+Package Rockpass release ARM64:
+  stage: Package
+  script:
+    - apk -U --no-progress add xz
+    - install -Dm755 "target/release/rockpass" "${PACKAGE_PATH_ARM64}/rockpass"
+    - install -Dm644 "rockpass.toml.example" "${PACKAGE_PATH_ARM64}/rockpass.toml.example"
+    - install -Dm644 "README.md" "${PACKAGE_PATH_ARM64}/README.md"
+    - install -Dm644 "LICENSE" "${PACKAGE_PATH_ARM64}/LICENSE"
+    - tar cvJf "${PACKAGE_NAME_ARM64}" "${PACKAGE_PATH_ARM64}"
+  artifacts:
+    name: ${ARTIFACTS_ARM64}
+    paths:
+      - ${PACKAGE_NAME_ARM64}
+  needs:
+    - Build Rockpass ARM64
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
 
@@ -77,6 +186,8 @@ Build and publish branch Docker image:
     - docker push ${QUAY_REGISTRY_URL}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${CI_COMMIT_REF_NAME}
   rules:
     - if: $CI_COMMIT_TAG == null && $CI_PROJECT_ID == "43241571" && $CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_REF_PROTECTED == "true"
+  needs:
+    - Build Rockpass AMD64 musl
 
 Build and publish release Docker image:
   stage: Docker
@@ -120,13 +231,19 @@ Build and publish release Docker image:
     - semver ${CI_COMMIT_TAG} ${QUAY_REGISTRY_URL}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
+  needs:
+    - Build Rockpass AMD64 musl
 
 Publish Rockpass release:
   stage: Publish
   image: curlimages/curl:latest
   script:
     - |
-      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME}"
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME_AMD64_GLIBC} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64_GLIBC}"
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME_AMD64_MUSL} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64_MUSL}"
+    - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME_ARM64} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_ARM64}"
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
 
@@ -135,6 +252,8 @@ Release:
   image: registry.gitlab.com/gitlab-org/release-cli:latest
   script: |
     release-cli create --name "Release ${CI_COMMIT_TAG}" --tag-name ${CI_COMMIT_TAG} \
-      --assets-link "{\"name\":\"${PACKAGE_NAME}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME}\"}"
+      --assets-link "{\"name\":\"${PACKAGE_NAME_AMD64_GLIBC}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64_GLIBC}\"}" \
+      --assets-link "{\"name\":\"${PACKAGE_NAME_AMD64_MUSL}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64_MUSL}\"}" \
+      --assets-link "{\"name\":\"${PACKAGE_NAME_ARM64}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_ARM64}\"}"
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
