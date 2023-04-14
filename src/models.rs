@@ -82,8 +82,12 @@ pub struct NewPassword {
     pub uppercase: bool,
     pub symbols: bool,
     pub lowercase: bool,
+    #[serde(alias = "number")]
     pub numbers: bool,
     pub counter: i32,
+    #[serde(default = "default_version")]
     pub version: i32,
     pub length: i32,
 }
+
+const fn default_version() -> i32 { 2 }

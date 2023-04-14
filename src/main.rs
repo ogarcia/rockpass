@@ -74,6 +74,8 @@ fn rocket() -> _ {
         .mount("/", routes![
                routes::options_auth_users,
                routes::post_auth_users,
+               routes::options_auth_users_me,
+               routes::get_auth_users_me,
                routes::options_auth_users_set_password,
                routes::post_auth_users_set_password,
                routes::options_auth_jwt_create,
@@ -165,6 +167,32 @@ mod tests {
         let response = request.dispatch().await;
         assert_eq!(response.status(), Status::Conflict);
         assert_eq!(response.into_string().await.unwrap(), r#"{"detail":"User already exists"}"#);
+    }
+
+    #[rocket::async_test]
+    async fn test_get_auth_users_me() {
+        let client = Client::tracked(rocket()).await.unwrap();
+        // Create a user and token
+        let token = create_token(&client).await;
+        // Attempt to get user data fails because no access token specified
+        let request = client.get("/auth/users/me")
+            .header(ContentType::JSON);
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::BadRequest);
+        // The attempt to get user data fails because, although a valid formatted token is
+        // specified, the token is not correct.
+        let request = client.get("/auth/users/me")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", "bearer false"));
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Unauthorized);
+        // Get user data
+        let request = client.get("/auth/users/me")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", format!("bearer {}", token.access)));
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Ok);
+        assert_eq!(response.into_string().await.unwrap(), r#"{"email":"test@rockpass.sample","id":1}"#);
     }
 
     #[rocket::async_test]
@@ -291,6 +319,13 @@ mod tests {
         let response = request.dispatch().await;
         assert_eq!(response.status(), Status::Created);
         assert_eq!(response.into_string().await.unwrap(), r#"{"detail":"Created new password entry for site rockpass.sample"}"#);
+        // Password is added with broken scheme
+        let request = client.post("/passwords")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", format!("bearer {}", token.access)))
+            .body(r#"{"login":"bob@rockpass.sample","site":"bob.rockpass.sample","uppercase":true,"symbols":true,"lowercase":true,"number":true,"counter":1,"length":16}"#);
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Created);
     }
 
     #[rocket::async_test]

@@ -1,6 +1,6 @@
 [package]
 name = "rockpass"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["Óscar García Amor"]
 license = "GPL-3.0"
 readme = "README.md"

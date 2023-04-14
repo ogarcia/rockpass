@@ -236,6 +236,21 @@ pub async fn post_auth_users(connection: RockpassDatabase, config: &State<Rockpa
     }
 }
 
+#[options("/auth/users/me")]
+pub async fn options_auth_users_me() -> Status {
+    Status::NoContent
+}
+
+#[get("/auth/users/me")]
+pub async fn get_auth_users_me(authorization: Authorization) -> status::Custom<Json<Value>> {
+    status::Custom(Status::Ok, Json(
+            json!({
+                "id": authorization.1.id,
+                "email": authorization.1.email
+            })
+        ))
+}
+
 #[options("/auth/users/set_password")]
 pub async fn options_auth_users_set_password() -> Status {
     Status::NoContent
