@@ -113,6 +113,17 @@ rustup override set stable
 
 [rustup]: https://rustup.rs/
 
+#### Installing dependencies
+
+Apart from Rust, to build rockpass you will need `sqlite3` (usually the
+`-dev` package) and the compiler tools. For example in Debian.
+```shell
+apt install build-essential libsqlite3-dev
+```
+
+Depending on the Linux distribution you use these packages may vary, consult
+the manual of yours for more information.
+
 #### Building Rockpass
 
 To build Rockpass binary simply execute the following commands.

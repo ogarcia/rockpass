@@ -348,7 +348,7 @@ mod tests {
             .body(r#"{"schema":"bad"}"#);
         let response = request.dispatch().await;
         assert_eq!(response.status(), Status::UnprocessableEntity);
-        // Password is added
+        // Password is added with old model
         let request = client.post("/passwords")
             .header(ContentType::JSON)
             .header(Header::new("authorization", format!("bearer {}", token.access)))
@@ -356,11 +356,18 @@ mod tests {
         let response = request.dispatch().await;
         assert_eq!(response.status(), Status::Created);
         assert_eq!(response.into_string().await.unwrap(), r#"{"detail":"Created new password entry for site rockpass.sample"}"#);
-        // Password is added with broken scheme
+        // Password is added with both models
         let request = client.post("/passwords")
             .header(ContentType::JSON)
             .header(Header::new("authorization", format!("bearer {}", token.access)))
-            .body(r#"{"login":"bob@rockpass.sample","site":"bob.rockpass.sample","uppercase":true,"symbols":true,"lowercase":true,"number":true,"counter":1,"length":16}"#);
+            .body(r#"{"login":"bob@rockpass.sample","site":"bob.rockpass.sample","uppercase":true,"symbols":true,"lowercase":true,"digits":true,"numbers":true,"counter":1,"length":16}"#);
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Created);
+        // Password is added with new model
+        let request = client.post("/passwords")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", format!("bearer {}", token.access)))
+            .body(r#"{"login":"charlie@rockpass.sample","site":"charlie.rockpass.sample","uppercase":true,"symbols":true,"lowercase":true,"digits":true,"counter":1,"length":16}"#);
         let response = request.dispatch().await;
         assert_eq!(response.status(), Status::Created);
     }
