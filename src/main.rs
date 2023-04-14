@@ -4,10 +4,7 @@
 // Distributed under terms of the GNU GPLv3 license.
 //
 
-//#![feature(proc_macro_hygiene, decl_macro)]
-
 #[macro_use] extern crate diesel;
-#[macro_use] extern crate diesel_migrations;
 #[macro_use] extern crate rocket;
 #[macro_use] extern crate rocket_sync_db_pools;
 
@@ -25,10 +22,14 @@ mod schema;
 pub struct RockpassDatabase(diesel::SqliteConnection);
 
 async fn database_migrations(rocket: Rocket<Build>) -> Rocket<Build> {
-    embed_migrations!();
+    use diesel_migrations::{embed_migrations, EmbeddedMigrations, MigrationHarness};
 
-    let connection = RockpassDatabase::get_one(&rocket).await.expect("database connection");
-    connection.run(|c| embedded_migrations::run(c)).await.expect("diesel migrations");
+    const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+    RockpassDatabase::get_one(&rocket).await
+        .expect("database connection")
+        .run(|c| { c.run_pending_migrations(MIGRATIONS).expect("diesel migrations"); })
+        .await;
 
     rocket
 }
@@ -55,15 +56,11 @@ impl Default for RockpassConfig {
 fn rocket() -> _ {
     let figment = Figment::from(rocket::Config::default())
         .merge(Serialized::defaults(RockpassConfig::default()))
+        .merge(Serialized::default("databases.rockpass.url", ":memory:"))
         .merge(Toml::file("/etc/rockpass.toml").nested())
         .merge(Toml::file("rockpass.toml").nested())
         .merge(Env::prefixed("ROCKPASS_").global())
         .select(Profile::from_env_or("ROCKPASS_PROFILE", "release"));
-    let database_url = match figment.extract_inner::<String>("databases.rockpass.url") {
-        Ok(database_url) => database_url,
-        Err(_) => ":memory:".to_string()
-    };
-    let figment = figment.merge(("databases.rockpass.url", database_url));
 
     rocket::custom(figment)
         .attach(fairings::Cors)

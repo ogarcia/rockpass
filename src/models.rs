@@ -95,7 +95,7 @@ fn digits_or_numbers<'d, D: Deserializer<'d>>(d: D) -> Result<bool, D::Error> {
 
 #[derive(Clone, Deserialize, Insertable, AsChangeset)]
 #[serde(crate = "rocket::serde")]
-#[table_name="passwords"]
+#[diesel(table_name = passwords)]
 pub struct NewPassword {
     pub login: String,
     pub site: String,
