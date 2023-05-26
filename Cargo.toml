@@ -19,7 +19,7 @@ base64 = "0.21.0"
 bcrypt = "0.14.0"
 chrono = { version = "0.4.24", features = ["serde"] }
 diesel = { version = "2.0.3", default-features = false, features = ["sqlite", "chrono"] }
-diesel_migrations = "2.0.0"
+diesel_migrations = "2.1.0"
 hmac = "0.12.1"
 jwt = "0.16.0"
 rocket = { version = "0.5.0-rc.3", features = ["json"] }
