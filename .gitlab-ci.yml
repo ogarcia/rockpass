@@ -50,6 +50,8 @@ Build AMD64 glibc:
 Build AMD64 musl:
   stage: Build
   image: rust:alpine
+  variables:
+    RUSTFLAGS: -Ctarget-feature=-crt-static
   script:
     - apk -U --no-progress add libc-dev sqlite-dev
     - cargo build --release --locked
@@ -65,6 +67,8 @@ Build AMD64 musl:
 Build ARM64:
   stage: Build
   image: rust:alpine
+  variables:
+    RUSTFLAGS: -Ctarget-feature=-crt-static
   script:
     - apk -U --no-progress add libc-dev sqlite-dev
     - cargo build --release --locked

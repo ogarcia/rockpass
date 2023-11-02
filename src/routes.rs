@@ -45,7 +45,7 @@ impl<'r> FromRequest<'r> for Authorization {
     async fn from_request(request: &'r Request<'_>) -> Outcome<Self, Self::Error> {
         // Seek for authorization header
         match request.headers().get_one("authorization") {
-            None => Outcome::Failure((Status::BadRequest, AuthorizationError::Missing)),
+            None => Outcome::Error((Status::BadRequest, AuthorizationError::Missing)),
             Some(auth) => {
                 // Authorization must start with 'bearer'
                 if (auth.len() > 7) && (&auth[..6].to_lowercase()) == "bearer" {
@@ -54,10 +54,10 @@ impl<'r> FromRequest<'r> for Authorization {
                     // Check the autorization token (remove 'bearer' and pass JWT token only)
                     match check_authorization(&connection, &auth[7..]).await {
                         Ok(authorized_user) => Outcome::Success(Authorization(connection, authorized_user)),
-                        Err(_) => Outcome::Failure((Status::Unauthorized, AuthorizationError::Unauthorized))
+                        Err(_) => Outcome::Error((Status::Unauthorized, AuthorizationError::Unauthorized))
                     }
                 } else {
-                    Outcome::Failure((Status::BadRequest, AuthorizationError::Invalid))
+                    Outcome::Error((Status::BadRequest, AuthorizationError::Invalid))
                 }
             }
         }
@@ -149,7 +149,7 @@ fn check_jwt(shared_key: &String, jwt_token: &String) -> Result<(), ()> {
     let key: Hmac<Sha256> = Hmac::new_from_slice(&format!("{}", shared_key).into_bytes()).unwrap();
     // Verify token with shared key
     let claims: BTreeMap<String, String> = jwt_token.verify_with_key(&key).map_err(|_| ())?;
-    let expiration_date = Utc.datetime_from_str(&claims["exp"], "%s").map_err(|_|())?;
+    let expiration_date = DateTime::parse_from_str(&claims["exp"], "%s").map_err(|_|())?;
     if expiration_date < Utc::now() {
         Err(()) // Token is valid but expired
     } else {
