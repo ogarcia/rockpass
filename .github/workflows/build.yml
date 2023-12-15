@@ -24,7 +24,7 @@ jobs:
           install -Dm644 "LICENSE" "rockpass-${GITHUB_REF##*/}-${GITHUB_SHA}-linux-amd64/LICENSE"
           echo "version=${GITHUB_REF##*/}-${GITHUB_SHA}-linux-amd64" >> $GITHUB_OUTPUT
       - name: Archive current compilation
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "rockpass-${{ steps.package-current.outputs.version }}"
           path: "rockpass-${{ steps.package-current.outputs.version }}/"
