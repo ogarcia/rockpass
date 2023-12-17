@@ -12,7 +12,7 @@ jobs:
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.67.0
+          toolchain: 1.74.1
       - name: Build
         run: cargo build --release --locked
       - name: Package current compilation
@@ -24,7 +24,7 @@ jobs:
           install -Dm644 "LICENSE" "rockpass-${GITHUB_REF##*/}-${GITHUB_SHA}-linux-amd64/LICENSE"
           echo "version=${GITHUB_REF##*/}-${GITHUB_SHA}-linux-amd64" >> $GITHUB_OUTPUT
       - name: Archive current compilation
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: "rockpass-${{ steps.package-current.outputs.version }}"
           path: "rockpass-${{ steps.package-current.outputs.version }}/"
