@@ -39,7 +39,7 @@ jobs:
           tar cvJf "rockpass-${GITHUB_REF##*/}-linux-amd64.tar.xz" "rockpass-${GITHUB_REF##*/}-linux-amd64"
           echo "version=${GITHUB_REF##*/}-linux-amd64" >> $GITHUB_OUTPUT
       - name: Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/') && github.event_name != 'pull_request'
         with:
           files: "rockpass-${{ steps.package.outputs.version }}.tar.xz"
