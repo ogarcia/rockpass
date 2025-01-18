@@ -350,7 +350,7 @@ Login: login@mail.com
 Lowercase: true
 Uppercase: true
 Symbols: true
-Numbers: true
+Digits: true
 Length: 16
 Couter: 1
 

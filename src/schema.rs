@@ -1,4 +1,4 @@
-table! {
+diesel::table! {
     passwords (id) {
         id -> Integer,
         user_id -> Integer,
@@ -7,7 +7,7 @@ table! {
         uppercase -> Bool,
         symbols -> Bool,
         lowercase -> Bool,
-        numbers -> Bool,
+        digits -> Bool,
         counter -> Integer,
         version -> Integer,
         length -> Integer,
@@ -16,7 +16,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     tokens (id) {
         id -> Integer,
         user_id -> Integer,
@@ -27,7 +27,7 @@ table! {
     }
 }
 
-table! {
+diesel::table! {
     users (id) {
         id -> Integer,
         email -> Text,
@@ -35,10 +35,10 @@ table! {
     }
 }
 
-joinable!(passwords -> users (user_id));
-joinable!(tokens -> users (user_id));
+diesel::joinable!(passwords -> users (user_id));
+diesel::joinable!(tokens -> users (user_id));
 
-allow_tables_to_appear_in_same_query!(
+diesel::allow_tables_to_appear_in_same_query!(
     passwords,
     tokens,
     users,

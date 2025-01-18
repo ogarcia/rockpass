@@ -134,17 +134,17 @@ mod tests {
         client.post("/passwords")
             .header(ContentType::JSON)
             .header(Header::new("authorization", format!("bearer {}", token.access)))
-            .body(r#"{"login":"alice@rockpass.sample","site":"rockpass.sample","uppercase":true,"symbols":true,"lowercase":true,"numbers":true,"counter":1,"version":2,"length":16}"#)
+            .body(r#"{"login":"alice@rockpass.sample","site":"rockpass.sample","uppercase":true,"symbols":true,"lowercase":true,"digits":true,"counter":1,"version":2,"length":16}"#)
             .dispatch().await;
         client.post("/passwords")
             .header(ContentType::JSON)
             .header(Header::new("authorization", format!("bearer {}", token.access)))
-            .body(r#"{"login":"bob@rockpass.sample","site":"subsite.rockpass.sample","uppercase":true,"symbols":false,"lowercase":true,"numbers":true,"counter":2,"version":2,"length":16}"#)
+            .body(r#"{"login":"bob@rockpass.sample","site":"subsite.rockpass.sample","uppercase":true,"symbols":false,"lowercase":true,"digits":true,"counter":2,"version":2,"length":16}"#)
             .dispatch().await;
         client.post("/passwords")
             .header(ContentType::JSON)
             .header(Header::new("authorization", format!("bearer {}", token.access)))
-            .body(r#"{"login":"charlie@rockpass.sample","site":"other.rockpass.sample","uppercase":true,"symbols":false,"lowercase":true,"numbers":false,"counter":1,"version":2,"length":8}"#)
+            .body(r#"{"login":"charlie@rockpass.sample","site":"other.rockpass.sample","uppercase":true,"symbols":false,"lowercase":true,"digits":false,"counter":1,"version":2,"length":8}"#)
             .dispatch().await;
     }
 
@@ -401,7 +401,7 @@ mod tests {
         let request = client.put("/passwords/100")
             .header(ContentType::JSON)
             .header(Header::new("authorization", format!("bearer {}", token.access)))
-            .body(r#"{"login":"alice@rockpass.sample","site":"rockpass.sample","uppercase":true,"symbols":true,"lowercase":true,"numbers":true,"counter":1,"version":2,"length":16}"#);
+            .body(r#"{"login":"alice@rockpass.sample","site":"rockpass.sample","uppercase":true,"symbols":true,"lowercase":true,"digits":true,"counter":1,"version":2,"length":16}"#);
         let response = request.dispatch().await;
         assert_eq!(response.status(), Status::InternalServerError);
         // Check that the password to be changed has the following default values
@@ -418,7 +418,7 @@ mod tests {
         let request = client.put("/passwords/1")
             .header(ContentType::JSON)
             .header(Header::new("authorization", format!("bearer {}", token.access)))
-            .body(r#"{"login":"alice@newmail.rockpass.sample","site":"rockpass.sample","uppercase":false,"symbols":true,"lowercase":true,"numbers":true,"counter":2,"version":2,"length":16}"#);
+            .body(r#"{"login":"alice@newmail.rockpass.sample","site":"rockpass.sample","uppercase":false,"symbols":true,"lowercase":true,"digits":true,"counter":2,"version":2,"length":16}"#);
         let response = request.dispatch().await;
         assert_eq!(response.status(), Status::Created);
         assert_eq!(response.into_string().await.unwrap(), r#"{"detail":"Updated password entry for site rockpass.sample"}"#);

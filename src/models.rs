@@ -71,7 +71,7 @@ pub struct Password {
     pub uppercase: bool,
     pub symbols: bool,
     pub lowercase: bool,
-    pub numbers: bool,
+    pub digits: bool,
     pub counter: i32,
     pub version: i32,
     pub length: i32,
@@ -103,7 +103,7 @@ pub struct NewPassword {
     pub symbols: bool,
     pub lowercase: bool,
     #[serde(deserialize_with = "digits_or_numbers", flatten)]
-    pub numbers: bool,
+    pub digits: bool,
     pub counter: i32,
     #[serde(default = "default_version")]
     pub version: i32,
