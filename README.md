@@ -44,7 +44,7 @@ learn how to create your first user.
 ### With Docker
 
 You can download a Rockpass Docker image from [here][glcr], from [Docker
-Hub][hub] or from [Quay][quay] (only `linux-amd64-musl`).
+Hub][hub] or from [Quay][quay] (only `linux-amd64`).
 
 To run it, simply exec.
 ```

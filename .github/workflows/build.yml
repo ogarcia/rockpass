@@ -9,12 +9,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.78.0
       - name: Build
-        run: cargo build --release --locked
+        run: |
+          docker run --rm -v $(pwd):/app -w /app rust:alpine sh -c "
+            apk -U --no-progress add musl-dev sqlite-dev sqlite-static
+            cargo build --release --locked
+          "
       - name: Package current compilation
         id: package-current
         run: |

@@ -5,12 +5,12 @@ variables:
   QUAY_REGISTRY_URL: "quay.io"
   PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/rockpass/${CI_COMMIT_TAG}"
   ARTIFACTS_AMD64_GLIBC: rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64-glibc
-  ARTIFACTS_AMD64_MUSL: rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64-musl
+  ARTIFACTS_AMD64_STATIC: rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-amd64-static
   ARTIFACTS_ARM64: rockpass-${CI_COMMIT_REF_NAME}-${CI_COMMIT_SHA}-linux-arm64
   PACKAGE_NAME_AMD64_GLIBC: rockpass-${CI_COMMIT_TAG}-linux-amd64-glibc.tar.xz
   PACKAGE_PATH_AMD64_GLIBC: rockpass-${CI_COMMIT_TAG}-linux-amd64-glibc
-  PACKAGE_NAME_AMD64_MUSL: rockpass-${CI_COMMIT_TAG}-linux-amd64-musl.tar.xz
-  PACKAGE_PATH_AMD64_MUSL: rockpass-${CI_COMMIT_TAG}-linux-amd64-musl
+  PACKAGE_NAME_AMD64_STATIC: rockpass-${CI_COMMIT_TAG}-linux-amd64-static.tar.xz
+  PACKAGE_PATH_AMD64_STATIC: rockpass-${CI_COMMIT_TAG}-linux-amd64-static
   PACKAGE_NAME_ARM64: rockpass-${CI_COMMIT_TAG}-linux-arm64.tar.xz
   PACKAGE_PATH_ARM64: rockpass-${CI_COMMIT_TAG}-linux-arm64
 
@@ -25,7 +25,7 @@ stages:
 
 Test AMD64 glibc:
   stage: Test
-  image: rust:buster
+  image: rust:bookworm
   script:
     - cargo test
   cache:
@@ -35,7 +35,7 @@ Test AMD64 glibc:
 
 Build AMD64 glibc:
   stage: Build
-  image: rust:buster
+  image: rust:bookworm
   script:
     - cargo build --release --locked
   artifacts:
@@ -47,20 +47,18 @@ Build AMD64 glibc:
     paths:
       - target
 
-Build AMD64 musl:
+Build AMD64 static:
   stage: Build
   image: rust:alpine
-  variables:
-    RUSTFLAGS: -Ctarget-feature=-crt-static
   script:
-    - apk -U --no-progress add libc-dev sqlite-dev
+    - apk -U --no-progress add musl-dev sqlite-dev sqlite-static
     - cargo build --release --locked
   artifacts:
-    name: ${ARTIFACTS_AMD64_MUSL}
+    name: ${ARTIFACTS_AMD64_STATIC}
     paths:
       - target/release/rockpass
   cache:
-    key: ${CI_COMMIT_REF_SLUG}-amd64-musl
+    key: ${CI_COMMIT_REF_SLUG}-amd64-static
     paths:
       - target
 
@@ -99,19 +97,19 @@ Archive AMD64 glibc:
   rules:
     - if: $CI_COMMIT_TAG == null && $CI_PIPELINE_SOURCE != "merge_request_event"
 
-Archive AMD64 musl:
+Archive AMD64 static:
   stage: Archive
   script:
-    - install -Dm755 "target/release/rockpass" "${ARTIFACTS_AMD64_MUSL}/rockpass"
-    - install -Dm644 "rockpass.toml.example" "${ARTIFACTS_AMD64_MUSL}/rockpass.toml.example"
-    - install -Dm644 "README.md" "${ARTIFACTS_AMD64_MUSL}/README.md"
-    - install -Dm644 "LICENSE" "${ARTIFACTS_AMD64_MUSL}/LICENSE"
+    - install -Dm755 "target/release/rockpass" "${ARTIFACTS_AMD64_STATIC}/rockpass"
+    - install -Dm644 "rockpass.toml.example" "${ARTIFACTS_AMD64_STATIC}/rockpass.toml.example"
+    - install -Dm644 "README.md" "${ARTIFACTS_AMD64_STATIC}/README.md"
+    - install -Dm644 "LICENSE" "${ARTIFACTS_AMD64_STATIC}/LICENSE"
   artifacts:
-    name: ${ARTIFACTS_AMD64_MUSL}
+    name: ${ARTIFACTS_AMD64_STATIC}
     paths:
-      - ${ARTIFACTS_AMD64_MUSL}/
+      - ${ARTIFACTS_AMD64_STATIC}/
   needs:
-    - Build AMD64 musl
+    - Build AMD64 static
   rules:
     - if: $CI_COMMIT_TAG == null && $CI_PIPELINE_SOURCE != "merge_request_event"
 
@@ -149,21 +147,21 @@ Package AMD64 glibc:
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
 
-Package AMD64 musl:
+Package AMD64 static:
   stage: Package
   script:
     - apk -U --no-progress add xz
-    - install -Dm755 "target/release/rockpass" "${PACKAGE_PATH_AMD64_MUSL}/rockpass"
-    - install -Dm644 "rockpass.toml.example" "${PACKAGE_PATH_AMD64_MUSL}/rockpass.toml.example"
-    - install -Dm644 "README.md" "${PACKAGE_PATH_AMD64_MUSL}/README.md"
-    - install -Dm644 "LICENSE" "${PACKAGE_PATH_AMD64_MUSL}/LICENSE"
-    - tar cvJf "${PACKAGE_NAME_AMD64_MUSL}" "${PACKAGE_PATH_AMD64_MUSL}"
+    - install -Dm755 "target/release/rockpass" "${PACKAGE_PATH_AMD64_STATIC}/rockpass"
+    - install -Dm644 "rockpass.toml.example" "${PACKAGE_PATH_AMD64_STATIC}/rockpass.toml.example"
+    - install -Dm644 "README.md" "${PACKAGE_PATH_AMD64_STATIC}/README.md"
+    - install -Dm644 "LICENSE" "${PACKAGE_PATH_AMD64_STATIC}/LICENSE"
+    - tar cvJf "${PACKAGE_NAME_AMD64_STATIC}" "${PACKAGE_PATH_AMD64_STATIC}"
   artifacts:
-    name: ${ARTIFACTS_AMD64_MUSL}
+    name: ${ARTIFACTS_AMD64_STATIC}
     paths:
-      - ${PACKAGE_NAME_AMD64_MUSL}
+      - ${PACKAGE_NAME_AMD64_STATIC}
   needs:
-    - Build AMD64 musl
+    - Build AMD64 static
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
 
@@ -203,7 +201,7 @@ Build and publish branch Docker image:
   rules:
     - if: $CI_COMMIT_TAG == null && $CI_PROJECT_ID == "43241571" && $CI_PIPELINE_SOURCE != "merge_request_event" && $CI_COMMIT_REF_PROTECTED == "true"
   needs:
-    - Build AMD64 musl
+    - Build AMD64 static
 
 Build and publish release Docker image:
   stage: Docker
@@ -248,7 +246,7 @@ Build and publish release Docker image:
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
   needs:
-    - Build AMD64 musl
+    - Build AMD64 static
 
 Publish release:
   stage: Publish
@@ -257,7 +255,7 @@ Publish release:
     - |
       curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME_AMD64_GLIBC} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64_GLIBC}"
     - |
-      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME_AMD64_MUSL} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64_MUSL}"
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME_AMD64_STATIC} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64_STATIC}"
     - |
       curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" --upload-file ${PACKAGE_NAME_ARM64} "${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_ARM64}"
   rules:
@@ -269,7 +267,7 @@ Release:
   script: |
     release-cli create --name "Release ${CI_COMMIT_TAG}" --tag-name ${CI_COMMIT_TAG} \
       --assets-link "{\"name\":\"${PACKAGE_NAME_AMD64_GLIBC}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64_GLIBC}\"}" \
-      --assets-link "{\"name\":\"${PACKAGE_NAME_AMD64_MUSL}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64_MUSL}\"}" \
+      --assets-link "{\"name\":\"${PACKAGE_NAME_AMD64_STATIC}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_AMD64_STATIC}\"}" \
       --assets-link "{\"name\":\"${PACKAGE_NAME_ARM64}\",\"url\":\"${PACKAGE_REGISTRY_URL}/${PACKAGE_NAME_ARM64}\"}"
   rules:
     - if: $CI_COMMIT_TAG && $CI_PROJECT_ID == "43241571"
