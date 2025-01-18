@@ -317,7 +317,7 @@ mod tests {
             .body(r#"{"current_password":"test","new_password":"new"}"#);
         let response = request.dispatch().await;
         assert_eq!(response.status(), Status::Ok);
-        assert_eq!(response.into_string().await.unwrap(), r#"{"detail":"Passwod changed for user test@rockpass.sample and deleted 1 old tokens"}"#);
+        assert_eq!(response.into_string().await.unwrap(), r#"{"detail":"Password changed for user test@rockpass.sample and deleted 1 old tokens"}"#);
     }
 
     #[rocket::async_test]

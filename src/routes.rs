@@ -303,7 +303,7 @@ pub async fn post_auth_users_set_password(authorization: Authorization, new_user
                     Ok(rows) => rows,
                     Err(_) => 0
                 };
-                status::Custom(Status::Ok, Json(json!({"detail": format!("Passwod changed for user {} and deleted {} old tokens", authorization.1.email, deleted_rows)})))
+                status::Custom(Status::Ok, Json(json!({"detail": format!("Password changed for user {} and deleted {} old tokens", authorization.1.email, deleted_rows)})))
             }
         }
     } else {
