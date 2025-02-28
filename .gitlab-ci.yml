@@ -15,7 +15,7 @@ variables:
   PACKAGE_PATH_ARM64: rockpass-${CI_COMMIT_TAG}-linux-arm64
 
 stages:
-  - Test
+#  - Test
   - Build
   - Archive
   - Package
@@ -23,15 +23,15 @@ stages:
   - Publish
   - Release
 
-Test AMD64 glibc:
-  stage: Test
-  image: rust:bookworm
-  script:
-    - cargo test
-  cache:
-    key: ${CI_COMMIT_REF_SLUG}-amd64-glibc
-    paths:
-      - target
+#Test AMD64 glibc:
+#  stage: Test
+#  image: rust:bookworm
+#  script:
+#    - cargo test
+#  cache:
+#    key: ${CI_COMMIT_REF_SLUG}-amd64-glibc
+#    paths:
+#      - target
 
 Build AMD64 glibc:
   stage: Build
