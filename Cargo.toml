@@ -16,13 +16,13 @@ include = ["migrations/", "src/", "diesel.toml", "LICENSE", "README.md", "rockpa
 
 [dependencies]
 base64 = "0.22.1"
-bcrypt = "0.16.0"
-chrono = { version = "0.4.39", features = ["serde"] }
-diesel = { version = "2.2.6", default-features = false, features = ["sqlite", "returning_clauses_for_sqlite_3_35", "chrono"] }
+bcrypt = "0.17.0"
+chrono = { version = "0.4.40", features = ["serde"] }
+diesel = { version = "2.2.7", default-features = false, features = ["sqlite", "returning_clauses_for_sqlite_3_35", "chrono"] }
 diesel_migrations = "2.2.0"
 hmac = "0.12.1"
 jwt = "0.16.0"
 rocket = { version = "0.5.1", features = ["json"] }
 rocket_sync_db_pools = { version = "0.1.0", default-features = false, features = ["diesel_sqlite_pool"] }
 sha2 = "0.10.8"
-uuid = { version = "1.12.0", default-features = false, features = ["v4"] }
+uuid = { version = "1.15.1", default-features = false, features = ["v4"] }
