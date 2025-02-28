@@ -397,17 +397,14 @@ pub async fn post_passwords(authorization: Authorization, new_password: Json<New
     // Insert new pasword in database
     let authorized_user_id = authorization.1.id;
     let new_password_to_insert = new_password.0.clone();
-    let inserted_rows = match connection.run(move |c| {
+    match connection.run(move |c| {
         diesel::insert_into(passwords)
             .values((passwords::user_id.eq(&authorized_user_id), &new_password_to_insert))
-            .execute(c)
+            .returning(Password::as_returning())
+            .get_result(c)
     }).await {
-        Ok(rows) => rows,
-        Err(_) => 0
-    };
-    match inserted_rows {
-        0 => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem creating the new password entry"}))),
-        _ => status::Custom(Status::Created, Json(json!({"detail": format!("Created new password entry for site {}", new_password.0.site)})))
+        Ok(inserted_row) => status::Custom(Status::Created, Json(json!(inserted_row))),
+        Err(_) => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem creating the new password entry"})))
     }
 }
 
@@ -415,6 +412,28 @@ pub async fn post_passwords(authorization: Authorization, new_password: Json<New
 pub async fn options_passwords_id(_password_id: i32) -> Status {
     Status::NoContent
 }
+
+#[get("/passwords/<password_id>")]
+pub async fn get_passwords_id(authorization: Authorization, password_id: i32) -> status::Custom<Json<Value>> {
+    let connection = authorization.0;
+    // Seek for passwords in database
+    let authorized_user_id = authorization.1.id;
+    match connection.run(move |c| {
+        passwords::table
+            .filter(passwords::id.eq(password_id))
+            .filter(passwords::user_id.eq(&authorized_user_id))
+            .limit(1)
+            .load::<Password>(c)
+    }).await {
+        Ok(results) => if results.is_empty() {
+            status::Custom(Status::NotFound, Json(json!({"detail": format!("Password {password_id} not found in database")})))
+        } else {
+            status::Custom(Status::Ok, Json(json!(results[0])))
+        },
+        Err(_) => status::Custom(Status::InternalServerError, Json(json!({"detail": "There was a problem getting password entry"})))
+    }
+}
+
 
 #[put("/passwords/<updated_password_id>", data = "<updated_password>")]
 pub async fn put_passwords_id(authorization: Authorization, updated_password_id: i32, updated_password: Json<NewPassword>) -> status::Custom<Json<Value>> {

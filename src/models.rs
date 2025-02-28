@@ -61,7 +61,7 @@ pub struct DBToken {
     pub modified: NaiveDateTime
 }
 
-#[derive(Serialize, Deserialize, Queryable)]
+#[derive(Serialize, Deserialize, Queryable, Selectable)]
 #[serde(crate = "rocket::serde")]
 pub struct Password {
     pub id: i32,

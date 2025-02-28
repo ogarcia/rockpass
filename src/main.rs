@@ -83,6 +83,7 @@ fn rocket() -> _ {
                routes::options_passwords,
                routes::get_passwords,
                routes::post_passwords,
+               routes::get_passwords_id,
                routes::options_passwords_id,
                routes::put_passwords_id,
                routes::delete_passwords_id
@@ -352,7 +353,6 @@ mod tests {
             .body(r#"{"login":"alice@rockpass.sample","site":"rockpass.sample","uppercase":true,"symbols":true,"lowercase":true,"numbers":true,"counter":1,"version":2,"length":16}"#);
         let response = request.dispatch().await;
         assert_eq!(response.status(), Status::Created);
-        assert_eq!(response.into_string().await.unwrap(), r#"{"detail":"Created new password entry for site rockpass.sample"}"#);
         // Password is added with both models
         let request = client.post("/passwords")
             .header(ContentType::JSON)
@@ -517,5 +517,60 @@ mod tests {
         assert_eq!(passwords.results[0].login, "alice@rockpass.sample");
         assert_eq!(passwords.results[1].login, "bob@rockpass.sample");
         assert_eq!(passwords.results[2].login, "charlie@rockpass.sample");
+    }
+
+    #[rocket::async_test]
+    async fn test_get_passwords_id() {
+        let client = Client::tracked(rocket()).await.unwrap();
+        // Create a user and token
+        let token = create_token(&client).await;
+        // Attempt to get password fails because no access token specified
+        let request = client.get("/passwords/1")
+            .header(ContentType::JSON);
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::BadRequest);
+        // The attempt to get the password fails because, although a valid formatted token is
+        // specified, the token is not correct.
+        let request = client.get("/passwords/1")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", "bearer false"));
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Unauthorized);
+        // Create some passwords
+        create_passwords(&client, &token).await;
+        // Get first password
+        let request = client.get("/passwords/1")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", format!("bearer {}", token.access)));
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Ok);
+        let password = response.into_json::<Password>().await.unwrap();
+        assert_eq!(password.uppercase, true);
+        assert_eq!(password.login, "alice@rockpass.sample");
+        // Get second password
+        let request = client.get("/passwords/2")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", format!("bearer {}", token.access)));
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Ok);
+        let password = response.into_json::<Password>().await.unwrap();
+        assert_eq!(password.symbols, false);
+        assert_eq!(password.counter, 2);
+        assert_eq!(password.login, "bob@rockpass.sample");
+        // Get third password
+        let request = client.get("/passwords/3")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", format!("bearer {}", token.access)));
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Ok);
+        let password = response.into_json::<Password>().await.unwrap();
+        assert_eq!(password.length, 8);
+        assert_eq!(password.login, "charlie@rockpass.sample");
+        // The attempt to get the password fails because password id does not exists
+        let request = client.get("/passwords/23")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", format!("bearer {}", token.access)));
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::NotFound);
     }
 }
