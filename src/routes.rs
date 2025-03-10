@@ -373,16 +373,24 @@ pub async fn options_passwords() -> Status {
     Status::NoContent
 }
 
-#[get("/passwords")]
-pub async fn get_passwords(authorization: Authorization) -> status::Custom<Json<Value>> {
+#[get("/passwords?<search>")]
+pub async fn get_passwords(authorization: Authorization, search: Option<String>) -> status::Custom<Json<Value>> {
     let connection = authorization.0;
     // Seek for passwords in database
     let authorized_user_id = authorization.1.id;
-    let results: Vec<Password> = connection.run(move |c| {
-        passwords::table
-            .filter(passwords::user_id.eq(&authorized_user_id))
-            .load::<Password>(c)
-    }).await.expect("load passwords");
+    let results: Vec<Password> = match search {
+        Some(search) => connection.run(move |c| {
+            passwords::table
+                .filter(passwords::user_id.eq(&authorized_user_id))
+                .filter(passwords::site.like(&format!("%{search}%")))
+                .load::<Password>(c)
+        }).await.expect("load passwords"),
+        None => connection.run(move |c| {
+            passwords::table
+                .filter(passwords::user_id.eq(&authorized_user_id))
+                .load::<Password>(c)
+        }).await.expect("load passwords")
+    };
     status::Custom(Status::Ok, Json(
             json!({
                 "count": results.len(),

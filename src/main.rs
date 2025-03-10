@@ -517,6 +517,17 @@ mod tests {
         assert_eq!(passwords.results[0].login, "alice@rockpass.sample");
         assert_eq!(passwords.results[1].login, "bob@rockpass.sample");
         assert_eq!(passwords.results[2].login, "charlie@rockpass.sample");
+        // Get a searched password
+        let request = client.get("/passwords/?search=subsite.rockpass.sample")
+            .header(ContentType::JSON)
+            .header(Header::new("authorization", format!("bearer {}", token.access)));
+        let response = request.dispatch().await;
+        assert_eq!(response.status(), Status::Ok);
+        let passwords = response.into_json::<Passwords>().await.unwrap();
+        assert_eq!(passwords.count, 1);
+        assert_eq!(passwords.results[0].login, "bob@rockpass.sample");
+        assert_eq!(passwords.results[0].symbols, false);
+        assert_eq!(passwords.results[0].counter, 2);
     }
 
     #[rocket::async_test]
