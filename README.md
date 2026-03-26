@@ -152,6 +152,10 @@ parameters are detailed below.
 | `refresh_token_lifetime` | Time, in seconds, that the refresh token is valid | 2592000 (30 days) |
 | `databases` | SQLite database location (see below) | {rockpass={url=":memory:"}} |
 
+Warning about tokens: Please note that, by standard definition, all tokens
+have a 60 second of grace period (leeway) to prevent issues caused by
+potential clock discrepancies between machines.
+
 The database configuration can be detailed in three options.
 
 Option One.

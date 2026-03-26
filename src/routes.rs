@@ -8,15 +8,12 @@ use bcrypt::{hash, verify};
 use chrono::Duration;
 use chrono::prelude::*;
 use diesel::{self, prelude::*};
-use hmac::{Hmac, Mac};
-use jwt::{Header, SignWithKey, Token, VerifyWithKey};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode, dangerous::insecure_decode};
 use rocket::State;
 use rocket::http::Status;
 use rocket::request::{Outcome, Request, FromRequest};
 use rocket::response::status;
-use rocket::serde::json::{Json, Value, json};
-use sha2::Sha256;
-use std::collections::BTreeMap;
+use rocket::serde::{Serialize, Deserialize, json::{Json, Value, json}};
 use uuid::Uuid;
 
 use crate::models::{AuthorizedUser, NewUser, NewUserPassword, User, UserPassword, JWTRefreshToken, DBToken, NewPassword, Password};
@@ -36,6 +33,13 @@ pub enum AuthorizationError {
     Missing,
     Invalid,
     Unauthorized
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(crate = "rocket::serde")]
+struct Claims {
+    uuid: String,
+    exp: usize
 }
 
 #[rocket::async_trait]
@@ -126,35 +130,33 @@ async fn get_authorized_user(connection: &RockpassDatabase, tokens_vector: &Vec<
 
 fn get_uuid_from_token(token: &str) -> Result<String, ()> {
     // Parse provided token and return UUID
-    let jwt_token: Token<Header, BTreeMap<String, String>, _> = Token::parse_unverified(token).map_err(|_| ())?;
-    let claims = jwt_token.claims();
-    Ok(claims["uuid"].to_string())
+    let token_data = insecure_decode::<Claims>(token).map_err(|_| ())?;
+    Ok(token_data.claims.uuid)
 }
 
-fn new_jwt(shared_key: &String, uuid: &String, token_lifetime: &i64) -> Result<String, jwt::Error> {
-    // Create new HMAC key with shared key
-    let key: Hmac<Sha256> = Hmac::new_from_slice(&format!("{}", shared_key).into_bytes()).unwrap();
-    // Add UUID into token
-    let mut claims = BTreeMap::new();
-    claims.insert("uuid", uuid);
-    // Add expiration date (in timestamp)
-    let expiration_date = (Utc::now() + Duration::seconds(*token_lifetime)).format("%s").to_string();
-    claims.insert("exp", &expiration_date);
+fn new_jwt(shared_key: &String, uuid: &String, token_lifetime: &i64) -> Result<String, jsonwebtoken::errors::Error> {
+    // Calculate expiration date
+    let expiration_date = Utc::now() + Duration::seconds(*token_lifetime);
+    // Insert data in claims
+    let claims = Claims {
+        uuid: uuid.to_owned(),
+        exp: expiration_date.timestamp() as usize
+    };
     // Return new JWT token
-    claims.sign_with_key(&key)
+    encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(shared_key.as_ref())
+    )
 }
 
 fn check_jwt(shared_key: &String, jwt_token: &String) -> Result<(), ()> {
-    // Create new HMAC key with shared key
-    let key: Hmac<Sha256> = Hmac::new_from_slice(&format!("{}", shared_key).into_bytes()).unwrap();
     // Verify token with shared key
-    let claims: BTreeMap<String, String> = jwt_token.verify_with_key(&key).map_err(|_| ())?;
-    let expiration_date = DateTime::parse_from_str(&claims["exp"], "%s").map_err(|_|())?;
-    if expiration_date < Utc::now() {
-        Err(()) // Token is valid but expired
-    } else {
-        Ok(()) // Token is valid
-    }
+    decode::<Claims>(
+        jwt_token,
+        &DecodingKey::from_secret(shared_key.as_ref()),
+        &Validation::default(),
+    ).map(|_| ()).map_err(|_| ())
 }
 
 async fn create_tokens(connection: &RockpassDatabase, user: &User, access_token_lifetime: &i64, refresh_token_lifetime: &i64) -> Result<(String, String), ()> {
