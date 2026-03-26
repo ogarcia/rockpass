@@ -24,7 +24,7 @@ use crate::schema::users::dsl::*;
 use crate::schema::{passwords, tokens, users};
 
 // Define bcrypt cost for password
-const BCRYPT_COST: u32 = 10;
+const BCRYPT_COST: u32 = 12;
 
 pub struct Authorization(RockpassDatabase, AuthorizedUser);
 
