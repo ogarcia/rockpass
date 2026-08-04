@@ -15,7 +15,7 @@ edition = "2024"
 include = ["migrations/", "src/", "diesel.toml", "LICENSE", "README.md", "rockpass.toml.example"]
 
 [dependencies]
-base64 = "0.22.1"
+base64 = "0.23.0"
 bcrypt = "0.19.0"
 chrono = { version = "0.4.44", features = ["serde"] }
 diesel = { version = "2.3.7", default-features = false, features = ["sqlite", "returning_clauses_for_sqlite_3_35", "chrono"] }
