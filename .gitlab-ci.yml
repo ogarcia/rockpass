@@ -79,7 +79,7 @@ Build ARM64:
     paths:
       - target
   tags:
-    - arm64
+    - saas-linux-small-arm64
 
 Archive AMD64 glibc:
   stage: Archive
