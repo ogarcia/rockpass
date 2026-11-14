@@ -146,7 +146,7 @@ fn new_jwt(shared_key: &String, uuid: &String, token_lifetime: &i64) -> Result<S
     encode(
         &Header::default(),
         &claims,
-        &EncodingKey::from_secret(shared_key.as_ref())
+        &EncodingKey::from_secret(shared_key.as_ref())?
     )
 }
 
@@ -154,7 +154,7 @@ fn check_jwt(shared_key: &String, jwt_token: &String) -> Result<(), ()> {
     // Verify token with shared key
     decode::<Claims>(
         jwt_token,
-        &DecodingKey::from_secret(shared_key.as_ref()),
+        &DecodingKey::from_secret(shared_key.as_ref()).map_err(|_| ())?,
         &Validation::default(),
     ).map(|_| ()).map_err(|_| ())
 }
