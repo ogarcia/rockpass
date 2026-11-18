@@ -22,5 +22,5 @@ diesel = { version = "2.4.0", default-features = false, features = ["sqlite", "r
 diesel_migrations = "2.4.0"
 jsonwebtoken = { version = "12.0.0", features = ["rust_crypto"] }
 rocket = { version = "0.5.2", features = ["json"] }
-rocket_sync_db_pools = { version = "0.1.0", default-features = false, features = ["diesel_sqlite_pool"] }
+rocket_sync_db_pools = { version = "0.2.0", default-features = false, features = ["diesel_sqlite_pool"] }
 uuid = { version = "1.29.2", default-features = false, features = ["v4"] }
